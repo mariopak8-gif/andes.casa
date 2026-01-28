@@ -1,65 +1,123 @@
-import Image from "next/image";
+import Navigation from '@/components/Navigation';
+import Image from 'next/image';
+import Link from 'next/link';
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <div className="font-montserrat text-gray-800 overflow-x-hidden">
+      {/* Navigation */}
+
+      {/* Hero Section */}
+      <section
+        id="home"
+        className="relative h-screen flex items-center justify-center text-center overflow-hidden bg-gradient-to-br from-purple-600 to-purple-900"
+      >
+        {/* Background Pattern */}
+        <div
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' fill='none'/%3E%3Ccircle cx='50' cy='50' r='1' fill='white' opacity='0.3'/%3E%3C/svg%3E")`,
+            backgroundSize: '50px 50px',
+          }}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+        {/* Background Image */}
+        <div className="absolute inset-0 w-full h-full">
+          <Image
+            src="/SmartScooterTechnology.png"
+            alt="Person riding electric scooter"
+            fill
+            className="object-cover opacity-40"
+          />
+        </div>
+
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/70 to-blue-900/80" />
+
+        {/* Content */}
+        <div className="relative z-10 max-w-4xl px-8">
+          <p className="text-lg text-white mb-4 font-light tracking-[3px] uppercase">
+            Empowering a Global Sharing Economy for Tomorrow's Leaders
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
+          <h1 className="font-playfair text-6xl md:text-7xl text-white mb-8 font-bold leading-tight">
+            Welcome to ANDES
+          </h1>
           <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            href="#solutions"
+            className="inline-block px-12 py-4 bg-white text-cyan-500 font-semibold text-lg rounded-full 
+                     transition-all duration-300 shadow-2xl hover:shadow-3xl hover:-translate-y-1 hover:bg-red-400 hover:text-white"
           >
+            Discover More
+          </a>
+        </div>
+
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-12 left-1/2 -translate-x-1/2 w-8 h-12 border-2 border-white/50 rounded-full">
+          <div className="absolute top-2.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-white/80 rounded-full animate-bounce" />
+        </div>
+      </section>
+
+      {/* Customized Solutions Section */}
+      <section id="solutions" className="py-32 px-[5%] bg-gradient-to-b from-gray-50 to-white relative">
+        {/* Top Gradient */}
+        <div className="absolute top-0 left-0 right-0 h-36 bg-gradient-to-b from-blue-900/5 to-transparent" />
+
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          {/* Image */}
+          <div className="relative rounded-3xl overflow-hidden shadow-2xl group">
             <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+              src="/Customizedsolutions.png"
+              alt="Group of people with electric scooters"
+              width={800}
+              height={600}
+              className="w-full h-auto block transition-transform duration-700 group-hover:scale-105"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/30 to-blue-900/30 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+          </div>
+
+          {/* Content */}
+          <div>
+            <h2 className="font-playfair text-5xl md:text-6xl text-blue-900 mb-8 leading-tight relative inline-block
+                          after:content-[''] after:absolute after:bottom-[-10px] after:left-0 after:w-20 after:h-1 after:bg-cyan-500 after:rounded-full">
+              Customized solutions
+            </h2>
+            <p className="text-lg leading-relaxed text-gray-600 mb-8">
+              The city is our most important customer. We look forward to establishing a close relationship with the
+              municipal government and working with them to make short trips as safe and efficient as possible.
+            </p>
+            <p className="text-base leading-relaxed text-gray-500 mb-10 pl-6 border-l-4 border-cyan-500">
+              We strive to be the most flexible partner possible, which is why we constantly improve our service based
+              on feedback from cities and riders.
+            </p>
+
+            {/* Features Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
+              {[
+                { title: 'Smart Scooter Technology', img: '/SmartScooterTechnology.png' },
+                { title: 'Global Network', img: '/GlobalNetwork.png' },
+                { title: 'Safe & Secure Rides', img: '/Safe&SecureRides.jpg' },
+                { title: 'Easy Mobile Access', img: '/SmartScooterTechnology.png' },
+              ].map((feature, index) => (
+                <div
+                  key={index}
+                  className="flex items-center gap-4 p-6 bg-white rounded-2xl shadow-lg transition-all duration-300 hover:-translate-y-2 hover:shadow-xl"
+                >
+                  <div className="w-12 h-12 flex-shrink-0 rounded-xl overflow-hidden bg-gradient-to-br from-cyan-500 to-blue-600">
+                    <Image
+                      src={feature.img}
+                      alt={feature.title}
+                      width={48}
+                      height={48}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="text-sm font-medium text-gray-800">{feature.title}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
-      </main>
+      </section>
     </div>
   );
 }
