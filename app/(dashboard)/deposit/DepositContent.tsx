@@ -87,21 +87,25 @@ export default function DepositContent() {
   const depositInfo = useMemo(() => {
     const infoMap = {
       trc20: {
+        id: "trc20",
         network: "Tron (TRC20)",
         token: "USDT / TRX",
         minDeposit: 10,
       },
       bep20: {
+        id: "bep20",
         network: "BNB Chain (BEP20)",
         token: "USDT / USDC",
         minDeposit: 10,
       },
       erc20: {
+        id: "erc20",
         network: "Ethereum (ERC20)",
         token: "USDT / USDC",
         minDeposit: 50,
       },
       polygon: {
+        id: "polygon",
         network: "Polygon",
         token: "USDT / USDC",
         minDeposit: 10,
@@ -110,6 +114,10 @@ export default function DepositContent() {
 
     return infoMap[selectedNetwork];
   }, [selectedNetwork]);
+
+  // Balance state 
+  const [walletBalance, setWalletBalance] = useState<{ trx: number; usdt: number } | null>(null);
+  const [loadingBalance, setLoadingBalance] = useState(false);
 
   // Format address for display
   const shortAddress = useMemo(() => {
@@ -131,6 +139,37 @@ export default function DepositContent() {
       generateAddress(selectedNetwork);
     }
   }, [authState, user?._id, currentAddress, generating, selectedNetwork, generateAddress]);
+
+  // Initial balance check on mount or address change
+  useEffect(() => {
+    let mounted = true;
+    
+    const checkBalance = async () => {
+      if (!currentAddress || selectedNetwork !== 'trc20') return;
+      
+      try {
+        setLoadingBalance(true);
+        const response = await fetch("/api/tron/check-deposits");
+        const data = await response.json();
+        
+        if (mounted && data.balance) {
+          setWalletBalance(data.balance);
+        }
+      } catch (error) {
+        console.error("Failed to fetch initial balance:", error);
+      } finally {
+        if (mounted) setLoadingBalance(false);
+      }
+    };
+
+    if (currentAddress) {
+      checkBalance();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [currentAddress, selectedNetwork]);
 
   // QR Code generation effect
   useEffect(() => {
@@ -162,17 +201,18 @@ export default function DepositContent() {
     try {
       await navigator.clipboard.writeText(currentAddress);
       setCopied(true);
-      toast.success("Address copied to clipboard!");
+      toast.success("Address copied");
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      toast.error("Failed to copy address");
-      console.error("Copy failed:", error);
+      toast.error("Failed to copy");
     }
   };
 
   // Handle network change
   const handleNetworkChange = (networkId: string) => {
     setSelectedNetwork(networkId as "trc20" | "bep20" | "erc20" | "polygon");
+    // Reset balance state on network change
+    setWalletBalance(null);
   };
 
   // Handle manual address generation (optional button)
@@ -180,162 +220,177 @@ export default function DepositContent() {
     await generateAddress(selectedNetwork);
   };
 
+  const checkDeposits = async () => {
+     try {
+        const toastId = toast.loading("Scanning blockchain...");
+        setLoadingBalance(true);
+        
+        const response = await fetch("/api/tron/check-deposits");
+        const data = await response.json();
+        
+        // Update balance state
+        if (data.balance) {
+          setWalletBalance(data.balance);
+        }
+        
+        if (data.totalNewDeposits > 0) {
+          toast.success(`Success! Found ${data.totalNewDeposits} new deposit(s)`, { id: toastId });
+        } else {
+          toast("No new transactions found", { icon: "🔍", id: toastId });
+        }
+      } catch (error) {
+        console.error("Check deposits failed:", error);
+        toast.error("Failed to sync deposits");
+      } finally {
+        setLoadingBalance(false);
+      }
+  };
+
   const userName = user?.fullname || "User";
 
   // Loading State
   if (authState === AUTH_STATE.LOADING) {
     return (
-      <main className="font-montserrat bg-gradient-to-br from-green-300 via-cyan-200 to-white min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-md w-full text-center p-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20">
-          <div className="flex flex-col items-center gap-6">
-            <div className="relative">
-              <div className="w-16 h-16 border-4 border-cyan-200 rounded-full"></div>
-              <div className="w-16 h-16 border-4 border-cyan-600 border-t-transparent rounded-full animate-spin absolute top-0 left-0"></div>
-            </div>
-
-            <div className="space-y-2">
-              <h3 className="text-xl font-semibold text-gray-800">
-                Loading Your Account
-              </h3>
-              <p className="text-sm text-gray-600">
-                Please wait while we verify your session...
-              </p>
-            </div>
-
-            <div className="flex gap-2">
-              <div
-                className="w-2 h-2 bg-cyan-600 rounded-full animate-bounce"
-                style={{ animationDelay: "0ms" }}
-              ></div>
-              <div
-                className="w-2 h-2 bg-cyan-600 rounded-full animate-bounce"
-                style={{ animationDelay: "150ms" }}
-              ></div>
-              <div
-                className="w-2 h-2 bg-cyan-600 rounded-full animate-bounce"
-                style={{ animationDelay: "300ms" }}
-              ></div>
-            </div>
-          </div>
-        </div>
-      </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+      </div>
     );
   }
 
   // Unauthenticated State
   if (authState === AUTH_STATE.UNAUTHENTICATED) {
-    return (
-      <main className="font-montserrat bg-gradient-to-br from-green-300 via-cyan-200 to-white min-h-screen flex items-center justify-center px-4">
-        <div className="max-w-lg w-full text-center p-8 bg-white/90 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20">
-          <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-cyan-500 to-cyan-600 rounded-full flex items-center justify-center">
-            <svg
-              className="w-10 h-10 text-white"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-              />
-            </svg>
-          </div>
-
-          <h2 className="text-2xl font-bold text-gray-800 mb-3">
-            Authentication Required
-          </h2>
-
-          <p className="text-gray-600 mb-8 leading-relaxed">
-            You need to be signed in to access deposit features and manage your
-            ANDES account.
-          </p>
-
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Link
-              href="/sign-in"
-              className="px-8 py-3 bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-700 hover:to-cyan-800 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="px-8 py-3 bg-white hover:bg-gray-50 text-gray-800 font-semibold rounded-lg border-2 border-gray-200 hover:border-gray-300 transition-all duration-200 transform hover:scale-105"
-            >
-              Create Account
-            </Link>
-          </div>
-
-          <p className="text-sm text-gray-500 mt-6">
-            New to ANDES?{" "}
-            <Link
-              href="/about"
-              className="text-cyan-600 hover:text-cyan-700 font-medium"
-            >
-              Learn more
-            </Link>
-          </p>
+     return (
+        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
+           <div className="text-center space-y-4">
+              <h2 className="text-2xl font-bold text-gray-900">Sign in Required</h2>
+              <p className="text-gray-600">Please access your account to manage deposits.</p>
+              <Link href="/sign-in" className="inline-block px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">
+                 Sign In
+              </Link>
+           </div>
         </div>
-      </main>
-    );
+     );
   }
 
-  // Authenticated State - Show main content
   return (
-    <main className="bg-gradient-to-br from-green-300 via-cyan-200 to-white min-h-screen px-4 py-8">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6 animate-fade-in">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-800 mb-2">
-            Welcome back, {userName}! 👋
+    <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-cyan-100 selection:text-cyan-900">
+      {/* Background Effects (Light Mode) */}
+      <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-100/60 blur-[100px]" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-100/60 blur-[100px]" />
+        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-[0.03]" />
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12">
+        {/* Header Section */}
+        <div className="mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 via-slate-700 to-slate-500">
+            Deposit Assets
           </h1>
-          <p className="text-gray-600">
-            Manage your deposits and track your team performance
+          <p className="mt-4 text-lg text-slate-500 max-w-2xl">
+            Securely fund your account using our multi-chain gateway. 
+            All deposits are monitored 24/7 with enterprise-grade security.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* LEFT COLUMN - Team Section */}
-          <div className="space-y-6 animate-slide-in-left">
-            {teamReport && (
-              <TeamSection teamReport={teamReport} userName={userName} />
-            )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* LEFT SIDE: Account Summary & Quick Actions */}
+          <div className="lg:col-span-4 space-y-6">
+             {/* Account Summary Card */}
+             <div className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/60 backdrop-blur-xl p-8 shadow-xl transition-all duration-300 hover:shadow-2xl hover:shadow-cyan-500/5 group">
+                {/* Card Decoration */}
+                <div className="absolute -right-12 -top-12 w-48 h-48 bg-gradient-to-br from-cyan-100 to-indigo-100 rounded-full blur-3xl opacity-60 group-hover:opacity-100 transition-all duration-500"></div>
+                
+                <div className="relative">
+                  <p className="text-slate-500 text-sm font-medium tracking-wide uppercase">Total Balance</p>
+                  <div className="mt-2 flex items-baseline gap-1">
+                    <span className="text-4xl md:text-5xl font-bold text-slate-900 tracking-tight">
+                      ${user?.balance?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || "0.00"}
+                    </span>
+                    <span className="text-lg text-slate-500 font-medium">USDT</span>
+                  </div>
+
+                  {/* Trust Badge */}
+                  <div className="mt-8 flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full w-fit">
+                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></div>
+                    <span className="text-xs font-semibold text-emerald-700">Secure Connection Active</span>
+                  </div>
+                </div>
+
+                {/* Quick Actions (Future) */}
+                <div className="mt-8 grid grid-cols-2 gap-3">
+                   <button onClick={() => toast("Withdrawals coming soon", { icon: "🚧" })} className="px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-all text-sm font-medium text-slate-600">
+                      Withdraw
+                   </button>
+                   <button className="px-4 py-3 rounded-xl bg-cyan-50 border border-cyan-100 text-cyan-700 cursor-default text-sm font-medium">
+                      Deposit
+                   </button>
+                </div>
+             </div>
+
+             {/* Team Stats Placeholder (Optional) */}
+             {/* <div className="rounded-3xl border border-slate-200 bg-white/60 backdrop-blur-sm p-6">
+                <h3 className="text-slate-500 text-sm font-medium uppercase tracking-wide mb-4">Team Performance</h3>
+                <div className="h-24 flex items-center justify-center text-slate-400 text-sm">
+                   Stats coming soon...
+                </div>
+             </div> */}
           </div>
 
-          {/* RIGHT COLUMN - Deposit Section */}
-          <div className="lg:col-span-2 space-y-6 animate-slide-in-right">
-            <DepositHeader />
+          {/* RIGHT SIDE: Main Deposit Interface */}
+          <div className="lg:col-span-8">
+            <div className="bg-white/80 backdrop-blur-2xl rounded-3xl border border-slate-200 shadow-xl overflow-hidden relative">
+               {/* Top Glow Line */}
+               <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-transparent via-cyan-500/20 to-transparent"></div>
 
-            <NetworkSelector
-              networks={networks}
-              selected={selectedNetwork}
-              onSelect={handleNetworkChange}
-            />
+               {/* Network Selector */}
+               <div className="px-6 md:px-8 pt-8">
+                  <NetworkSelector
+                    networks={networks}
+                    selected={selectedNetwork}
+                    onSelect={handleNetworkChange}
+                  />
+               </div>
 
-            <DepositCard
-              loading={generating}
-              qrSrc={qrSrc}
-              shortAddress={shortAddress}
-              userAddress={currentAddress}
-              copied={copied}
-              onCopy={handleCopy}
-              depositInfo={depositInfo}
-            />
+               {/* Divider */}
+               <div className="h-px bg-slate-100 my-2 mx-8"></div>
 
-            {/* Optional: Manual regenerate button */}
-            {!generating && currentAddress && (
-              <div className="text-center">
-                <button
-                  onClick={handleGenerateAddress}
-                  className="text-sm text-cyan-600 hover:text-cyan-700 font-medium underline"
-                >
-                  Generate New Address
-                </button>
-              </div>
-            )}
+               <div className="p-6 md:p-8">
+                   <DepositCard
+                      loading={generating || loadingBalance}
+                      checking={loadingBalance}
+                      qrSrc={qrSrc}
+                      shortAddress={shortAddress}
+                      userAddress={currentAddress}
+                      copied={copied}
+                      onCopy={handleCopy}
+                      depositInfo={depositInfo}
+                      walletBalance={walletBalance}
+                      onCheckDeposit={checkDeposits}
+                      onGenerateAddress={handleGenerateAddress}
+                    />
+               </div>
+            </div>
+            
+            <div className="mt-6 flex flex-wrap justify-center gap-6 text-slate-500 text-xs font-medium">
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> 
+                  Bank-Grade Encryption
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                  Instant Processing
+                </span>
+                <span className="flex items-center gap-1.5">
+                   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                   Verified Merchants
+                </span>
+            </div>
+
           </div>
         </div>
       </div>
-    </main>
+    </div>
   );
 }

@@ -97,6 +97,9 @@ export const recordDeposit = mutation({
 
     const now = Date.now();
 
+    console.log('recod data ',args);
+    
+
     // Create new deposit transaction
     const transactionId = await ctx.db.insert("transaction", {
       userId: args.userId,
@@ -125,32 +128,51 @@ export const updateDepositStatus = mutation({
       v.literal("completed"),
       v.literal("failed")
     ),
+    
   },
   handler: async (ctx, args) => {
+    // ✅ Index lookup — O(1) instead of full table scan via .filter()
+    // Requires: defineTable("transaction").index("by_transactionHash", ["transactionHash"])
     const transaction = await ctx.db
       .query("transaction")
-      .filter((q) => q.eq(q.field("transactionHash"), args.transactionHash))
-      .first();
+      .withIndex("by_transactionHash", (q) =>
+        q.eq("transactionHash", args.transactionHash)
+      )
+      .unique();
 
     if (!transaction) {
-      throw new Error("Transaction not found");
+      throw new Error(`Transaction not found: ${args.transactionHash}`);
+    }
+
+    // No-op guard — avoids unnecessary writes and double-credit risk
+    if (transaction.status === args.status) {
+      return transaction._id;
+    }
+
+    // Credit user balance when transitioning to completed
+    if (
+      args.status === "completed" &&
+      transaction.status !== "completed" &&
+      transaction.type === "deposit"
+    ) {
+      const user = await ctx.db.get(transaction.userId);
+
+      if (!user) {
+        throw new Error(`User not found for transaction: ${args.transactionHash}`);
+      }
+
+      // ✅ Atomic patch — Convex mutations are serialized per document,
+      // so reading and writing in the same mutation prevents race conditions
+      await ctx.db.patch(transaction.userId, {
+        balance: (user.balance ?? 0) + transaction.amount,
+        lastDepositCheck: Date.now(),
+      });
     }
 
     await ctx.db.patch(transaction._id, {
       status: args.status,
       updatedAt: Date.now(),
     });
-
-    // If completed, credit user balance
-    if (args.status === "completed" && transaction.type === "deposit") {
-      const user = await ctx.db.get(transaction.userId);
-      if (user) {
-        const currentBalance = user.balance || 0;
-        await ctx.db.patch(transaction.userId, {
-          balance: currentBalance + transaction.amount,
-        });
-      }
-    }
 
     return transaction._id;
   },

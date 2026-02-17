@@ -222,13 +222,20 @@ export const registerUser = action({
     
     // Assign deposit addresses to the new user
     try {
-      await ctx.runAction((internal as any).userNode.generateUserAddresses, {
+      const addresses = await ctx.runAction((internal as any).userNode.generateUserAddresses, {
         userId: newUser.toString(),
+      });
+      
+      // Save the generated addresses
+      await ctx.runMutation(internal.user.saveAllAddresses, {
+        userId: newUser,
+        addresses,
       });
     } catch (e) {
       console.error("Failed to assign addresses:", e);
       // Don't fail registration if address assignment fails
     }
+
     
     // console.log("User created successfully");
     return { success: true, error: null };
@@ -397,6 +404,30 @@ export const updateLastDepositCheck = mutation({
     return {
       userId: args.userId,
       timestamp: args.timestamp,
+      updatedAt: Date.now(),
+    };
+  },
+});
+export const updateUserBalance = mutation({
+  args: {
+    userId: v.id("user"),
+    totalCredited: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    
+    if (!user) {
+      throw new Error("User not found");
+    }
+
+    // Update the user's lastDepositCheck field
+    await ctx.db.patch(args.userId, {
+      balance: args.totalCredited,
+    });
+
+    
+    return {
+      userId: args.userId,
       updatedAt: Date.now(),
     };
   },

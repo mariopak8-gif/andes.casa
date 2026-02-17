@@ -1,6 +1,5 @@
-// pages/api/tron/check-deposits.ts
-
-import type { NextApiRequest, NextApiResponse } from "next";
+import axios from "axios";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { ConvexHttpClient } from "convex/browser";
@@ -9,117 +8,171 @@ import { getAccountBalance, getNewTransactions } from "@/lib/tron/utils";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "GET") {
-    return res.status(405).json({ error: "Method not allowed" });
+async function getTrxPriceInUsdt() {
+  try {
+    const response = await axios.get(
+      "https://api.coingecko.com/api/v3/simple/price?ids=tron&vs_currencies=usd"
+    );
+    return response.data.tron.usd;
+  } catch (error) {
+    console.error("Failed to fetch TRX price:", error);
+    return 0.15;
   }
+}
 
+export async function GET(req: Request) {
   try {
     console.log("🔐 Checking authentication...");
-    
-    // Verify authentication
-    const session = await getServerSession(req, res, authOptions);
-    
+
+    const session = await getServerSession(authOptions);
+
     if (!session?.user?.contact) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user from Convex
     const user = await convex.query(api.user.getUserByContact, {
       contact: session.user.contact,
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // Get user's TRC20 deposit address
     const depositAddress = user.depositAddresses?.trc20;
-    
+
     if (!depositAddress) {
-      return res.status(404).json({ 
-        error: "No deposit address found",
-        message: "Please generate a deposit address first"
-      });
+      return NextResponse.json(
+        {
+          error: "No deposit address found",
+          message: "Please generate a deposit address first",
+        },
+        { status: 404 }
+      );
     }
 
     console.log("📍 Checking deposits for address:", depositAddress);
 
-    // Get current balance
+    const checkStartedAt = Date.now();
+
+    const trxPrice = await getTrxPriceInUsdt();
+    console.log(`💱 Current TRX Price: $${trxPrice}`);
+
     const balance = await getAccountBalance(depositAddress);
-    
-    console.log("💰 Balance:", balance);
+    console.log(`💰 Wallet Balance — TRX: ${balance.trx}, USDT: ${balance.usdt}`);
 
-    // Get last check timestamp from database
-    // This prevents processing the same transactions multiple times
+    const trxAsUsdt = balance.trx * trxPrice;
+    const totalWalletUsdt = balance.usdt + trxAsUsdt;
+    console.log(
+      `💰 Combined Balance: $${totalWalletUsdt.toFixed(4)} (TRX: ${balance.trx} → $${trxAsUsdt.toFixed(4)}, USDT: ${balance.usdt})`
+    );
+
     const lastCheck = user.lastDepositCheck || 0;
-    
-    // Get new transactions since last check
-    const newTransactions = await getNewTransactions(depositAddress, lastCheck);
-    
-    console.log(`📊 Found ${newTransactions.length} new transactions`);
+    const alreadyCredited = user.balance || 0;
 
-    // Process new deposits
+    const newTransactions = await getNewTransactions(depositAddress, lastCheck);
+    console.log(
+      `📊 Found ${newTransactions.length} new transactions since ${new Date(lastCheck).toISOString()}`
+    );
+
     const deposits = [];
-    
+
     for (const tx of newTransactions) {
-      // Only process incoming transactions
       if (tx.to !== depositAddress) continue;
-      
-      // Only process confirmed transactions
-      if (!tx.confirmed) continue;
-      
-      // Record deposit in database
+
+      if (!tx.confirmed) {
+        console.log(`⏳ Skipping unconfirmed tx: ${tx.txHash}`);
+        continue;
+      }
+
+      const txAmountUsdt =
+        tx.type === "TRX"
+          ? Number(tx.amount) * trxPrice
+          : Number(tx.amount);
+
       try {
+        // 1. Record the deposit entry (idempotent via hash check inside recordDeposit)
         const depositId = await convex.mutation(api.deposit.recordDeposit, {
           userId: user._id,
-          network: 'trc20',
-          amount: tx.type === 'TRX' ? tx.amount : tx.amount,
+          network: "trc20",
+          amount: txAmountUsdt,
           walletAddress: depositAddress,
           transactionHash: tx.txHash,
         });
-        
+
+        // 2. Mark the individual tx as completed (this does NOT touch user.balance —
+        //    balance is updated in bulk below via updateUserBalance)
+        await convex.mutation(api.deposit.updateDepositStatus, {
+          transactionHash: tx.txHash,
+          status: "completed",
+        });
+
         deposits.push({
           id: depositId,
           txHash: tx.txHash,
-          amount: tx.amount,
+          amount: txAmountUsdt,
+          originalAmount: tx.amount,
           type: tx.type,
           timestamp: tx.timestamp,
         });
-        
-        console.log(`✅ Recorded deposit: ${tx.amount} ${tx.type}`);
+
+        console.log(
+          `✅ Recorded tx entry: $${txAmountUsdt.toFixed(4)} (${tx.amount} ${tx.type}) — hash: ${tx.txHash}`
+        );
       } catch (error) {
-        console.error("Error recording deposit:", error);
+        console.error(`❌ Error recording deposit for tx ${tx.txHash}:`, error);
       }
     }
 
-    // Update last check timestamp
-    if (newTransactions.length > 0) {
-      const latestTimestamp = Math.max(...newTransactions.map(tx => tx.timestamp));
-      
-      // TODO: Add this mutation to update last check time
-      // await convex.mutation(api.user.updateLastDepositCheck, {
-      //   userId: user._id,
-      //   timestamp: latestTimestamp,
-      // });
+    // ── Credit the wallet balance delta to the user ───────────────────────────
+    const newCreditAmount = totalWalletUsdt - alreadyCredited;
+
+    if (newCreditAmount > 0.001) {
+      console.log(
+        `💳 Crediting $${newCreditAmount.toFixed(4)} USDT to user balance ` +
+          `(wallet total: $${totalWalletUsdt.toFixed(4)}, already credited: $${alreadyCredited.toFixed(4)})`
+      );
+
+      // ✅ Correct mutation — directly patches user.balance with the delta
+      await convex.mutation(api.user.updateUserBalance, {
+        userId: user._id,
+        totalCredited: totalWalletUsdt,
+      });
+
+      console.log(`✅ User balance updated — added $${newCreditAmount.toFixed(4)} USDT`);
+    } else {
+      console.log(
+        `ℹ️ No new amount to credit (wallet: $${totalWalletUsdt.toFixed(4)}, already credited: $${alreadyCredited.toFixed(4)})`
+      );
     }
 
-    return res.status(200).json({
+    // ── Always advance lastCheck to when THIS poll started ────────────────────
+    await convex.mutation(api.deposit.updateLastDepositCheck, {
+      userId: user._id,
+      timestamp: checkStartedAt,
+    });
+    console.log(`🕐 lastCheck advanced to ${new Date(checkStartedAt).toISOString()}`);
+
+    return NextResponse.json({
       address: depositAddress,
-      balance,
+      balance: {
+        ...balance,
+        trxAsUsdt,
+        totalUsdt: totalWalletUsdt,
+      },
       newDeposits: deposits,
       totalNewDeposits: deposits.length,
+      credited: newCreditAmount > 0.001 ? newCreditAmount : 0,
     });
-
   } catch (error: any) {
     console.error("❌ Error checking deposits:", error);
-    
-    return res.status(500).json({
-      error: "Failed to check deposits",
-      details: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
+
+    return NextResponse.json(
+      {
+        error: "Failed to check deposits",
+        details:
+          process.env.NODE_ENV === "development" ? error.message : undefined,
+      },
+      { status: 500 }
+    );
   }
 }

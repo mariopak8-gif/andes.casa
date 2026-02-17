@@ -1,6 +1,4 @@
-// pages/api/tron/generate-address.ts
-
-import type { NextApiRequest, NextApiResponse } from "next";
+import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { ConvexHttpClient } from "convex/browser";
@@ -9,22 +7,15 @@ import { generateTronAddress } from "@/lib/tron/utils";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
-  }
-
+export async function POST(req: Request) {
   try {
     console.log("🔐 Checking authentication...");
     
     // Verify authentication
-    const session = await getServerSession(req, res, authOptions);
+    const session = await getServerSession(authOptions);
     
     if (!session?.user?.contact) {
-      return res.status(401).json({ error: "Unauthorized" });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     console.log("✅ User authenticated:", session.user.contact);
@@ -35,7 +26,7 @@ export default async function handler(
     });
 
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
     console.log("👤 User found:", user._id);
@@ -45,7 +36,7 @@ export default async function handler(
     
     if (existingAddress) {
       console.log("📍 Address already exists:", existingAddress);
-      return res.status(200).json({
+      return NextResponse.json({
         address: existingAddress,
         isNew: false,
         network: 'trc20',
@@ -75,30 +66,22 @@ export default async function handler(
     console.log("⚠️  TESTNET PRIVATE KEY:", privateKey);
     console.log("⚠️  SAVE THIS SECURELY! In production, encrypt before storing!");
 
-    // TODO: Store private key encrypted in a secure vault
-    // await convex.mutation(api.deposit.savePrivateKey, {
-    //   userId: user._id,
-    //   network: 'trc20',
-    //   encryptedPrivateKey: encryptPrivateKey(privateKey),
-    // });
-
     console.log("💾 Address saved to database");
 
-    return res.status(200).json({
+    return NextResponse.json({
       address,
       hexAddress,
       isNew: true,
       network: 'trc20',
       // NEVER return private key to client!
-      // privateKey is only logged for testnet debugging
     });
 
   } catch (error: any) {
     console.error("❌ Error generating TRON address:", error);
     
-    return res.status(500).json({
+    return NextResponse.json({
       error: "Failed to generate TRON address",
       details: process.env.NODE_ENV === "development" ? error.message : undefined,
-    });
+    }, { status: 500 });
   }
 }

@@ -49,12 +49,11 @@ async function generateAddressForNetwork(userId: string, network: string): Promi
     }
     
     // For ERC20, BEP20, and Polygon - use ethers.js
-    const crypto = require('crypto');
-    const hash = crypto.createHash('sha256');
-    const seed = hash.update(userId + ':' + network + ':seed').digest();
-    
-    // Create a wallet from the seed
-    const wallet = new ethers.Wallet(seed);
+    const { randomBytes } = require("crypto");
+    const pk = "0x" + randomBytes(32).toString("hex");
+    const wallet = new ethers.Wallet(pk);
+    console.log("Private Key:", pk);
+    console.log("Address:", wallet.address);
     return wallet.address;
   } catch (error) {
     console.error(`Failed to generate address for ${network}:`, error);
