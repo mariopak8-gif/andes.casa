@@ -4,6 +4,7 @@ import ClerkProviderWrapper from "./ClerkProvider";
 import "./globals.css";
 import NextAuthSessionProvider from "./SessionProvider";
 import { ToasterWrapper } from "./ToasterWrapper";
+import ConvexClientProvider from "./ConvexClientProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,16 +41,20 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${playfairDisplay.variable} antialiased`}
       >
         <NextAuthSessionProvider>
-          <ClerkProviderWrapper>
+          {/* <ClerkProviderWrapper> */}
+          <ConvexClientProvider>
+
             <main>
 
               {children}
             </main>
             <ToasterWrapper />
-          </ClerkProviderWrapper>
+          {/* </ClerkProviderWrapper> */}
+          </ConvexClientProvider>
         </NextAuthSessionProvider>
       </body>
     </html>

@@ -55,7 +55,7 @@ export default defineSchema({
     transactionHash: v.optional(v.string()),
     createdAt: v.number(),
     updatedAt: v.number(),
-  }).index("by_userId", ["userId"]).index("by_type", ["type"]),
+  }).index("by_userId", ["userId"]).index("by_type", ["type"]).index("by_transactionHash", ["transactionHash"]),
 
   // 🔑 Invitation codes
   invite: defineTable({

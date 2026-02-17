@@ -15,6 +15,7 @@ import type * as team from "../team.js";
 import type * as transaction from "../transaction.js";
 import type * as user from "../user.js";
 import type * as userNode from "../userNode.js";
+import type * as withdrawal from "../withdrawal.js";
 
 import type {
   ApiFromModules,
@@ -30,6 +31,7 @@ declare const fullApi: ApiFromModules<{
   transaction: typeof transaction;
   user: typeof user;
   userNode: typeof userNode;
+  withdrawal: typeof withdrawal;
 }>;
 
 /**

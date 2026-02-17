@@ -1,6 +1,7 @@
 // lib/tron/utils.ts
 
 const TronWeb = require('tronweb');
+import axios from 'axios';
 import { ACTIVE_NETWORK, ACTIVE_USDT_CONTRACT, MIN_DEPOSIT } from './config';
 
 // Initialize TronWeb instance
@@ -43,6 +44,11 @@ export async function getAccountBalance(address: string) {
   const tronWeb = getTronWeb();
   
   try {
+    // Set address to enable contract calls without private key
+    if (address && tronWeb.isAddress(address)) {
+        tronWeb.setAddress(address);
+    }
+
     // Get TRX balance
     const trxBalance = await tronWeb.trx.getBalance(address);
     const trxBalanceInTRX = tronWeb.fromSun(trxBalance);
@@ -178,12 +184,21 @@ export async function getNewTransactions(
   const tronWeb = getTronWeb();
   
   try {
-    // Get recent transactions
-    const transactions = await tronWeb.trx.getTransactionsRelated(
-      address,
-      'all',
-      50
-    );
+    // USE TRONGRID V1 API instead of getTransactionsRelated (which often returns 405)
+    // https://developers.tron.network/reference/get-transactions-by-account-address
+    
+    const url = `${ACTIVE_NETWORK.fullHost}/v1/accounts/${address}/transactions`;
+    const response = await axios.get(url, {
+      params: {
+        only_confirmed: true,
+        limit: 50,
+      },
+      headers: {
+        'TRON-PRO-API-KEY': process.env.TRONGRID_API_KEY || ''
+      }
+    });
+
+    const transactions = response.data.data || [];
     
     // Filter transactions newer than lastCheckTimestamp
     const newTransactions = transactions.filter((tx: any) => {
@@ -229,7 +244,8 @@ export async function getNewTransactions(
     return parsedTransactions;
   } catch (error) {
     console.error('Error monitoring address:', error);
-    throw error;
+    // Return empty array on error instead of throwing to prevent crashing the check loop
+    return []; 
   }
 }
 

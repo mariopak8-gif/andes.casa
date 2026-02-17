@@ -39,7 +39,7 @@ export default function RegisterPage() {
 
   // Use Convex action to register users (requires Convex dev/service running)
   const registerUser = useAction(api.user.registerUser);
-  const user = useQuery(api.user.getUserByContact, { contact: phoneNumber });
+  // const user = useQuery(api.user.getUserByContact, { contact: phoneNumber });
 
   // Validation functions
   const validatePhone = (phone: string) => {
