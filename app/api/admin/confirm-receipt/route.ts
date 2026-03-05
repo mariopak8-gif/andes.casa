@@ -76,7 +76,7 @@ export async function POST(req: Request) {
       userId,
       amount,
       txHash: transactionHash,
-      newBalance: result.newBalance,
+      newBalance: result.newDeposit,
     });
 
     return NextResponse.json({
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       message: `Credited ${amount} USDT to user account`,
       userId,
       amount,
-      newBalance: result.newBalance,
+      newBalance: result.newDeposit,
       transactionHash,
       transactionId: result.transactionId,
     });

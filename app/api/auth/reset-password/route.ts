@@ -23,10 +23,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Reset password using Convex action
-    const result: any = await convex.action(api.user.resetPasswordAction, {
-      token,
+    const result: any = await convex.action(api.user.resetPassword, {
+      resetToken:token,
       email,
-      password,
+      newPassword:password,
     });
 
     if (!result.success) {
