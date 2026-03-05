@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query, action } from "./_generated/server";
 import { ConvexError } from "convex/values";
 import { api } from "./_generated/api";
+import { Id } from "./_generated/dataModel";
 
 /**
  * Simple custom hash function for Convex (synchronous, no setTimeout)
@@ -28,6 +29,16 @@ function generateInvitationCode(): string {
 /**
  * Get user by contact (phone number)
  */
+export const getUserByInvitationCode = query({
+  args: { invitationCde: v.string() },
+  handler: async (ctx, args) => {
+   return await ctx.db
+      .query("user")
+      .withIndex('by_InvitationCode', (q) => q.eq("invitationCode", args.invitationCde)) 
+      .first();
+
+  },
+});
 export const getUserByContact = query({
   args: { contact: v.string() },
   handler: async (ctx, args) => {
@@ -113,6 +124,7 @@ export const updateUserBalance = mutation({
     depositAmount: v.optional(v.number()),
     investedCapital: v.optional(v.number()),
     lockedPrincipal: v.optional(v.number()),
+    referredBy: v.optional(v.array(v.id("user"))),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
@@ -120,27 +132,17 @@ export const updateUserBalance = mutation({
       throw new ConvexError("User not found");
     }
 
-    const updateData: any = {};
-    
-    if (args.earnings !== undefined) {
-      updateData.earnings = args.earnings;
-    }
-    if (args.depositAmount !== undefined) {
-      updateData.depositAmount = args.depositAmount;
-    }
-    if (args.investedCapital !== undefined) {
-      updateData.investedCapital = args.investedCapital;
-    }
-    if (args.lockedPrincipal !== undefined) {
-      updateData.lockedPrincipal = args.lockedPrincipal;
-    }
+    const { userId, ...fields } = args;
 
-    await ctx.db.patch(args.userId, updateData);
+    const updateData = Object.fromEntries(
+      Object.entries(fields).filter(([_, v]) => v !== undefined)
+    );
+
+    await ctx.db.patch(userId, updateData);
 
     return { success: true };
   },
 });
-
 /**
  * Register a new user with password hashing
  */
