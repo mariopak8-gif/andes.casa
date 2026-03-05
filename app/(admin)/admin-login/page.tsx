@@ -120,16 +120,8 @@ export default function AdminLoginPage() {
               {isLoading ? '🔄 Logging in...' : '🔓 Admin Login'}
             </button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-8 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-            <p className="text-xs font-semibold text-blue-700 mb-3">📝 Demo Credentials:</p>
-            <div className="space-y-2 text-xs text-blue-600 font-mono">
-              <p><strong>Username:</strong> superadmin</p>
-              <p><strong>Secret Key:</strong> super-secret-key-123</p>
-            </div>
-          </div>
         </div>
+
 
         {/* Footer Links */}
         <div className="text-center space-y-2">

@@ -15,7 +15,6 @@ export default function WithdrawContent() {
   const [txPassword, setTxPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
-  const [showForgottenModal, setShowForgottenModal] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const network = "trc20";
 
@@ -81,21 +80,7 @@ export default function WithdrawContent() {
     }
   }, [timeRemainingQuery, passwordLockTimeRemaining]);
 
-  const handleMarkForgotten = async () => {
-    if (!user?._id) {
-      toast.error("User not found");
-      return;
-    }
-
-    try {
-      await markForgottenMutation({ userId: user._id });
-      toast.success("Password marked as forgotten. You can withdraw after 24 hours without entering a password.");
-      setShowForgottenModal(false);
-    } catch (error) {
-      console.error("Failed to mark password as forgotten:", error);
-      toast.error("Failed to mark password as forgotten. Please try again.");
-    }
-  };
+  
 
   const formatTimeRemaining = (ms: number | null): string => {
     if (ms === null || ms === undefined || ms <= 0) return "Ready";
@@ -425,15 +410,7 @@ export default function WithdrawContent() {
                       >
                         Reset password via email
                       </Link>
-                      {!timeRemaining && !isPasswordLocked && (
-                        <button
-                          type="button"
-                          onClick={() => setShowForgottenModal(true)}
-                          className="text-sm text-amber-600 hover:text-amber-700 font-medium px-2 py-1 rounded border border-amber-300 hover:bg-amber-50 transition-colors"
-                        >
-                          Mark as forgotten
-                        </button>
-                      )}
+                      
                     </div>
                   </div>
                 </div>
@@ -584,48 +561,6 @@ export default function WithdrawContent() {
           </div>
         </div>
       </div>
-
-      {/* Forgotten Password Confirmation Modal */}
-      {showForgottenModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4">
-            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-amber-100 mx-auto">
-              <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4v2m0 4v2" />
-              </svg>
-            </div>
-            <div className="text-center">
-              <h3 className="text-lg font-bold text-gray-800">Mark Password as Forgotten?</h3>
-              <p className="text-gray-600 text-sm mt-2">
-                You will be able to withdraw after <span className="font-bold">24 hours</span> without entering your transaction password.
-              </p>
-              <p className="text-gray-500 text-xs mt-3">
-                To access your funds sooner, reset your password via email.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <button
-                onClick={handleMarkForgotten}
-                className="w-full py-2 px-4 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-lg transition-colors"
-              >
-                Yes, mark as forgotten
-              </button>
-              <button
-                onClick={() => setShowForgottenModal(false)}
-                className="w-full py-2 px-4 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <Link
-                href="/forgot-transaction-password"
-                className="block w-full text-center py-2 px-4 bg-cyan-100 hover:bg-cyan-200 text-cyan-700 font-semibold rounded-lg transition-colors text-sm"
-              >
-                Reset password via email
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

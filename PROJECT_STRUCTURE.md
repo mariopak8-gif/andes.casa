@@ -60,7 +60,6 @@ app/
 components/
 ├── shared/                 # Reusable components
 │   ├── Navigation.tsx
-│   ├── NavigationWrapper.tsx
 │   └── SupportChat.tsx
 ├── features/               # Feature-specific components
 │   ├── auth/

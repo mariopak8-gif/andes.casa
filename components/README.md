@@ -54,7 +54,6 @@ export default ComponentName;
 
 ### Shared Components
 - `Navigation.tsx` - Main navigation
-- `NavigationWrapper.tsx` - Layout wrapper
 - `SupportChat.tsx` - Support chat widget
 - `Header.tsx` - Page headers
 - `Footer.tsx` - Page footer
@@ -72,7 +71,6 @@ Always export from index files for cleaner imports:
 ```typescript
 // components/shared/index.ts
 export { Navigation } from './Navigation';
-export { NavigationWrapper } from './NavigationWrapper';
 export { SupportChat } from './SupportChat';
 ```
 

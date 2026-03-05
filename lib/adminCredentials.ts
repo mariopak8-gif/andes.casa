@@ -9,17 +9,17 @@ export interface AdminCredential {
   username: string;
   secretKey: string;
   email: string;
-  role: 'superadmin' | 'admin';
+  role: string;
   description: string;
   active: boolean;
 }
 
 export const ADMIN_CREDENTIALS: AdminCredential[] = [
   {
-    username: 'superadmin',
-    secretKey: 'super-secret-key-123',
+    username: process.env.ADMIN_USERNAME!,
+    secretKey: process.env.SUPER_SCREET_KEY!,
     email: 'admin@andes.com',
-    role: 'superadmin',
+    role: process.env.ADMIN_USERNAME!,
     description: 'Super Administrator',
     active: true,
   },
