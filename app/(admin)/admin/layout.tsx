@@ -94,10 +94,10 @@ export default function AdminLayout({
             A
           </div>
           {sidebarOpen && (
-            <div>
+            <Link href={'/dashboard'}>
               <h1 className="text-xl font-bold">ANDES</h1>
               <p className="text-xs text-gray-400">Admin</p>
-            </div>
+            </Link>
           )}
         </div>
 

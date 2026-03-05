@@ -1,14 +1,14 @@
 "use client";
 
 import React, { useState } from "react";
-import { useAction, useMutation, useQuery } from 'convex/react';
-import { api } from '@/convex/_generated/api';
+import { useAction, useMutation, useQuery } from "convex/react";
+import { api } from "@/convex/_generated/api";
 import SupportChat from "@/components/SupportChat";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { ALLOWED_COUNTRY_CODES } from "@/constants/countryCodes";
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -27,14 +27,18 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [generatedPin, setGeneratedPin] = useState<string>("");
   const [locationCountry, setLocationCountry] = useState<string | null>(null);
-  const [phoneCountryDetected, setPhoneCountryDetected] = useState<string | null>(null);
-  const [locationMismatch, setLocationMismatch] = useState<boolean | null>(null);
+  const [phoneCountryDetected, setPhoneCountryDetected] = useState<
+    string | null
+  >(null);
+  const [locationMismatch, setLocationMismatch] = useState<boolean | null>(
+    null,
+  );
 
   // Browser geolocation + reverse geocoding helpers
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
       );
       if (!res.ok) return null;
       const json = await res.json();
@@ -47,15 +51,20 @@ export default function RegisterPage() {
 
   const getCurrentPositionAsync = () =>
     new Promise<GeolocationPosition>((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        timeout: 10000,
+      }),
     );
 
   React.useEffect(() => {
     (async () => {
-      if (typeof window !== "undefined" && 'geolocation' in navigator) {
+      if (typeof window !== "undefined" && "geolocation" in navigator) {
         try {
           const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          const cc = await reverseGeocode(
+            pos.coords.latitude,
+            pos.coords.longitude,
+          );
           if (cc) setLocationCountry(cc);
         } catch (err) {
           // ignore; we'll fallback to IP lookup on submit
@@ -79,6 +88,12 @@ export default function RegisterPage() {
 
   // Use Convex mutation to register users (requires Convex dev/service running)
   const registerUser = useMutation(api.user.registerUser);
+  const updateUser = useMutation(api.user.updateUserBalance);
+
+  const lookForInvitationCode = useQuery(
+    api.user.getUserByInvitationCode,
+    invitationCode ? { invitationCde: invitationCode } : "skip",
+  );
   // const user = useQuery(api.user.getUserByContact, { contact: phoneNumber });
 
   // Validation functions
@@ -140,10 +155,17 @@ export default function RegisterPage() {
       }
 
       // If still no country from IP, try browser geolocation as last resort
-      if (!detectedCountry && typeof window !== "undefined" && 'geolocation' in navigator) {
+      if (
+        !detectedCountry &&
+        typeof window !== "undefined" &&
+        "geolocation" in navigator
+      ) {
         try {
           const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          const cc = await reverseGeocode(
+            pos.coords.latitude,
+            pos.coords.longitude,
+          );
           if (cc) setLocationCountry(cc);
         } catch (e) {
           // ignore
@@ -166,17 +188,25 @@ export default function RegisterPage() {
     }
 
     // parse phone early for validation and auto-allow decisions
-    const parsed = phoneNumber ? parsePhoneNumberFromString(`${countryCode}${phoneNumber}`) : null;
+    const parsed = phoneNumber
+      ? parsePhoneNumberFromString(`${countryCode}${phoneNumber}`)
+      : null;
 
     // Basic client-side validation
     // ensure we actually know the browser location
     if (!locationCountry) {
-      setError("Unable to detect your location. Please allow location access or check your network.");
+      setError(
+        "Unable to detect your location. Please allow location access or check your network.",
+      );
       return;
     }
     // verify code is in whitelist — but auto-allow if parsed phone country matches detected location
     if (!ALLOWED_COUNTRY_CODES.includes(countryCode)) {
-      const phoneCountryMatchesLocation = parsed && parsed.country && locationCountry && parsed.country === locationCountry;
+      const phoneCountryMatchesLocation =
+        parsed &&
+        parsed.country &&
+        locationCountry &&
+        parsed.country === locationCountry;
       if (!phoneCountryMatchesLocation) {
         setError("Country code not supported");
         return;
@@ -188,8 +218,8 @@ export default function RegisterPage() {
       return;
     }
     // ensure number actually belongs to country
-    if (!parsed || parsed.countryCallingCode !== countryCode.replace('+','')) {
-      setError('Phone number does not match country code');
+    if (!parsed || parsed.countryCallingCode !== countryCode.replace("+", "")) {
+      setError("Phone number does not match country code");
       return;
     }
 
@@ -204,7 +234,7 @@ export default function RegisterPage() {
     // Enforce that phone country matches detected IP country
     if (locationMismatch === true) {
       setError(
-        `Detected location ${locationCountry} does not match phone country ${phoneCountryDetected}. Please use a local phone number.`
+        `Detected location ${locationCountry} does not match phone country ${phoneCountryDetected}. Please use a local phone number.`,
       );
       return;
     }
@@ -245,8 +275,16 @@ export default function RegisterPage() {
         return;
       }
 
+      // ✅ Run referral update independently of the success branch
+      if (invitationCode && lookForInvitationCode) {
+        await updateUser({
+          userId: lookForInvitationCode._id,
+          referredBy: [result.userId], // ✅ array of the newly registered user's ID
+        });
+      }
+
       // On success, navigate to sign-in page
-      router.push('/sign-in');
+      router.push("/sign-in");
     } catch (err: any) {
       setError(err?.message || "Unexpected error during registration");
     } finally {
@@ -274,7 +312,9 @@ export default function RegisterPage() {
                 <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
               </svg>
             </button>
-            <label className="text-white text-sm font-semibold flex-1 text-center mx-2 border border-green-400 rounded px-3 py-1">Language selection</label>
+            <label className="text-white text-sm font-semibold flex-1 text-center mx-2 border border-green-400 rounded px-3 py-1">
+              Language selection
+            </label>
             <div className="flex items-center gap-3">
               <select
                 value={language}
@@ -397,7 +437,9 @@ export default function RegisterPage() {
                 <option value="+57">🇨🇴 Colombia +57</option>
                 <option value="+269">🇰🇲 Comoros +269</option>
                 <option value="+242">🇨🇬 Congo +242</option>
-                <option value="+243">🇨🇩 Democratic Republic of Congo +243</option>
+                <option value="+243">
+                  🇨🇩 Democratic Republic of Congo +243
+                </option>
                 <option value="+682">🇨🇰 Cook Islands +682</option>
                 <option value="+506">🇨🇷 Costa Rica +506</option>
                 <option value="+385">🇭🇷 Croatia +385</option>
@@ -528,7 +570,9 @@ export default function RegisterPage() {
                 <option value="+1758">🇱🇨 Saint Lucia +1758</option>
                 <option value="+590">🇲🇫 Saint Martin +590</option>
                 <option value="+508">🇵🇲 Saint Pierre and Miquelon +508</option>
-                <option value="+1784">🇻🇨 Saint Vincent and the Grenadines +1784</option>
+                <option value="+1784">
+                  🇻🇨 Saint Vincent and the Grenadines +1784
+                </option>
                 <option value="+685">🇼🇸 Samoa +685</option>
                 <option value="+378">🇸🇲 San Marino +378</option>
                 <option value="+239">🇸🇹 Sao Tome and Principe +239</option>
@@ -600,8 +644,8 @@ export default function RegisterPage() {
                   phoneNumber && phoneValid === true
                     ? "border-green-500"
                     : phoneNumber
-                    ? "border-red-500"
-                    : "border-gray-500"
+                      ? "border-red-500"
+                      : "border-gray-500"
                 }`}
               />
               <span className="text-red-500 font-bold text-lg">1</span>
@@ -612,7 +656,8 @@ export default function RegisterPage() {
               )}
               {locationMismatch === true && (
                 <p className="text-yellow-300 text-xs mt-1 absolute left-0 top-full">
-                  Detected location {locationCountry} does not match phone country {phoneCountryDetected}.
+                  Detected location {locationCountry} does not match phone
+                  country {phoneCountryDetected}.
                 </p>
               )}
             </div>
@@ -632,8 +677,8 @@ export default function RegisterPage() {
                 email && emailValid === true
                   ? "border-green-500"
                   : email
-                  ? "border-red-500"
-                  : "border-gray-500"
+                    ? "border-red-500"
+                    : "border-gray-500"
               }`}
             />
             {emailValid === false && (
@@ -661,11 +706,13 @@ export default function RegisterPage() {
                 password && passwordValid === true
                   ? "border-green-500"
                   : password
-                  ? "border-red-500"
-                  : "border-gray-500"
+                    ? "border-red-500"
+                    : "border-gray-500"
               }`}
             />
-            <span className="absolute right-4 top-3 text-red-500 font-bold text-lg">2</span>
+            <span className="absolute right-4 top-3 text-red-500 font-bold text-lg">
+              2
+            </span>
           </div>
 
           {/* Confirm Password */}
@@ -682,8 +729,8 @@ export default function RegisterPage() {
                 confirm && confirmValid === true
                   ? "border-green-500"
                   : confirm
-                  ? "border-red-500"
-                  : "border-gray-500"
+                    ? "border-red-500"
+                    : "border-gray-500"
               }`}
             />
             {confirmValid === false && (
@@ -707,11 +754,13 @@ export default function RegisterPage() {
                 txPassword && txPasswordValid === true
                   ? "border-green-500"
                   : txPassword
-                  ? "border-red-500"
-                  : "border-gray-500"
+                    ? "border-red-500"
+                    : "border-gray-500"
               }`}
             />
-            <span className="absolute right-4 top-3 text-red-500 font-bold text-lg">3</span>
+            <span className="absolute right-4 top-3 text-red-500 font-bold text-lg">
+              3
+            </span>
             {txPasswordValid === false && (
               <p className="text-red-400 text-xs mt-1">
                 Transaction password must be at least 6 characters.
@@ -721,7 +770,7 @@ export default function RegisterPage() {
 
           {/* PIN */}
 
-           <div className="relative">
+          <div className="relative">
             <input
               value={invitationCode}
               onChange={(e) => {
@@ -729,14 +778,16 @@ export default function RegisterPage() {
               }}
               placeholder="Please enter invitation code"
               type="text"
-              className='w-full px-4 py-3 rounded border-2 bg-[#152a4a] text-white text-sm focus:outline-none'
+              className="w-full px-4 py-3 rounded border-2 bg-[#152a4a] text-white text-sm focus:outline-none"
             />
           </div>
           {/* <div className="text-center py-4 border-t border-[#2a4a7a]">
             <span className="text-gray-400 text-sm font-semibold">{generatedPin}</span>
           </div> */}
 
-          {error && <div className="text-red-400 text-sm text-center">{error}</div>}
+          {error && (
+            <div className="text-red-400 text-sm text-center">{error}</div>
+          )}
 
           <button
             type="submit"
@@ -747,12 +798,12 @@ export default function RegisterPage() {
           </button>
 
           <Link href="/sign-in" prefetch>
-          <button
-            type="button"
-            className="w-full bg-[#2a5a9a] text-white font-semibold py-2 rounded hover:bg-[#3a6aaa] transition-colors duration-200"
-          >
-            Login
-          </button>
+            <button
+              type="button"
+              className="w-full bg-[#2a5a9a] text-white font-semibold py-2 rounded hover:bg-[#3a6aaa] transition-colors duration-200"
+            >
+              Login
+            </button>
           </Link>
         </form>
       </div>

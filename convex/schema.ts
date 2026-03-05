@@ -2,7 +2,6 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export default defineSchema({
-
   // 👤 Users
   user: defineTable({
     countryCode: v.string(),
@@ -21,29 +20,34 @@ export default defineSchema({
     resetToken: v.optional(v.string()),
     resetTokenExpiry: v.optional(v.number()),
     // Deposit addresses (public, shown to user)
-    depositAddresses: v.optional(v.object({
-      trc20:    v.optional(v.string()),
-      bep20:    v.optional(v.string()),
-      erc20:    v.optional(v.string()),
-      polygon:  v.optional(v.string()),
-    })),
+    depositAddresses: v.optional(
+      v.object({
+        trc20: v.optional(v.string()),
+        bep20: v.optional(v.string()),
+        erc20: v.optional(v.string()),
+        polygon: v.optional(v.string()),
+      }),
+    ),
     // ✅ NEW: Private keys for per-user deposit addresses (never expose to client)
-    depositPrivateKeys: v.optional(v.object({
-      trc20:    v.optional(v.string()),
-      bep20:    v.optional(v.string()),
-      erc20:    v.optional(v.string()),
-      polygon:  v.optional(v.string()),
-    })),
+    depositPrivateKeys: v.optional(
+      v.object({
+        trc20: v.optional(v.string()),
+        bep20: v.optional(v.string()),
+        erc20: v.optional(v.string()),
+        polygon: v.optional(v.string()),
+      }),
+    ),
     lastDepositCheck: v.optional(v.number()),
     invitationExpiry: v.optional(v.number()),
-    referredBy: v.optional(v.id("user")),
+    referredBy: v.optional(v.array(v.id("user"))),
     lockedPrincipal: v.optional(v.number()),
     passwordForgottenAt: v.optional(v.number()),
     transactionPasswordChangedAt: v.optional(v.number()),
     transferredOut: v.optional(v.number()),
   })
     .index("by_contact", ["contact"])
-    .index("by_email", ["email"]),
+    .index("by_email", ["email"])
+    .index("by_InvitationCode", ["invitationCode"]),
 
   // 💳 Transactions
   transaction: defineTable({
@@ -54,12 +58,12 @@ export default defineSchema({
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),
-      v.literal("polygon")
+      v.literal("polygon"),
     ),
     status: v.union(
       v.literal("pending"),
       v.literal("completed"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
     walletAddress: v.optional(v.string()),
     transactionHash: v.optional(v.string()),
@@ -98,7 +102,7 @@ export default defineSchema({
       v.literal("active"),
       v.literal("completed"),
       v.literal("expired"),
-      v.literal("closed")
+      v.literal("closed"),
     ),
     durationHours: v.number(),
     earningsAwarded: v.optional(v.number()),
@@ -120,13 +124,13 @@ export default defineSchema({
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),
-      v.literal("polygon")
+      v.literal("polygon"),
     ),
     status: v.union(
       v.literal("pending"),
       v.literal("processing"),
       v.literal("completed"),
-      v.literal("failed")
+      v.literal("failed"),
     ),
     transactionHash: v.optional(v.string()),
     reason: v.optional(v.string()),

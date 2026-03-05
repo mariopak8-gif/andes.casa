@@ -11,9 +11,14 @@ import { Id } from "./_generated/dataModel";
  */
 export const setDepositAddress = mutation({
   args: {
-    userId:     v.id("user"),
-    network:    v.union(v.literal("trc20"), v.literal("bep20"), v.literal("erc20"), v.literal("polygon")),
-    address:    v.string(),
+    userId: v.id("user"),
+    network: v.union(
+      v.literal("trc20"),
+      v.literal("bep20"),
+      v.literal("erc20"),
+      v.literal("polygon"),
+    ),
+    address: v.string(),
     privateKey: v.string(), // stored securely, never exposed via queries
   },
   handler: async (ctx, args) => {
@@ -31,11 +36,13 @@ export const setDepositAddress = mutation({
     };
 
     await ctx.db.patch(args.userId, {
-      depositAddresses:    updatedAddresses,
-      depositPrivateKeys:  updatedKeys,
+      depositAddresses: updatedAddresses,
+      depositPrivateKeys: updatedKeys,
     });
 
-    console.log(`[CONVEX] Deposit address set for user ${args.userId} — network: ${args.network}, address: ${args.address}`);
+    console.log(
+      `[CONVEX] Deposit address set for user ${args.userId} — network: ${args.network}, address: ${args.address}`,
+    );
     return args.address;
   },
 });
@@ -45,8 +52,13 @@ export const setDepositAddress = mutation({
  */
 export const saveDepositAddress = mutation({
   args: {
-    userId:  v.id("user"),
-    network: v.union(v.literal("trc20"), v.literal("bep20"), v.literal("erc20"), v.literal("polygon")),
+    userId: v.id("user"),
+    network: v.union(
+      v.literal("trc20"),
+      v.literal("bep20"),
+      v.literal("erc20"),
+      v.literal("polygon"),
+    ),
     address: v.string(),
   },
   handler: async (ctx, args) => {
@@ -81,8 +93,13 @@ export const getUserDepositAddresses = query({
  */
 export const getDepositPrivateKey = query({
   args: {
-    userId:  v.id("user"),
-    network: v.union(v.literal("trc20"), v.literal("bep20"), v.literal("erc20"), v.literal("polygon")),
+    userId: v.id("user"),
+    network: v.union(
+      v.literal("trc20"),
+      v.literal("bep20"),
+      v.literal("erc20"),
+      v.literal("polygon"),
+    ),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
@@ -98,10 +115,15 @@ export const getDepositPrivateKey = query({
  */
 export const recordDeposit = mutation({
   args: {
-    userId:          v.id("user"),
-    network:         v.union(v.literal("trc20"), v.literal("bep20"), v.literal("erc20"), v.literal("polygon")),
-    amount:          v.number(),
-    walletAddress:   v.string(),
+    userId: v.id("user"),
+    network: v.union(
+      v.literal("trc20"),
+      v.literal("bep20"),
+      v.literal("erc20"),
+      v.literal("polygon"),
+    ),
+    amount: v.number(),
+    walletAddress: v.string(),
     transactionHash: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
@@ -109,29 +131,35 @@ export const recordDeposit = mutation({
     if (args.transactionHash) {
       const existing = await ctx.db
         .query("transaction")
-        .withIndex("by_transactionHash", (q) => q.eq("transactionHash", args.transactionHash!))
+        .withIndex("by_transactionHash", (q) =>
+          q.eq("transactionHash", args.transactionHash!),
+        )
         .unique();
 
       if (existing) {
-        console.log(`[CONVEX] Deposit already recorded: ${args.transactionHash}`);
+        console.log(
+          `[CONVEX] Deposit already recorded: ${args.transactionHash}`,
+        );
         return existing._id;
       }
     }
 
     const now = Date.now();
     const transactionId = await ctx.db.insert("transaction", {
-      userId:          args.userId,
-      type:            "deposit",
-      network:         args.network,
-      amount:          args.amount,
-      walletAddress:   args.walletAddress,
+      userId: args.userId,
+      type: "deposit",
+      network: args.network,
+      amount: args.amount,
+      walletAddress: args.walletAddress,
       transactionHash: args.transactionHash,
-      status:          "pending",
-      createdAt:       now,
-      updatedAt:       now,
+      status: "pending",
+      createdAt: now,
+      updatedAt: now,
     });
 
-    console.log(`[CONVEX] Deposit recorded — $${args.amount} | hash: ${args.transactionHash} | id: ${transactionId}`);
+    console.log(
+      `[CONVEX] Deposit recorded — $${args.amount} | hash: ${args.transactionHash} | id: ${transactionId}`,
+    );
     return transactionId;
   },
 });
@@ -142,12 +170,18 @@ export const recordDeposit = mutation({
 export const updateDepositStatus = mutation({
   args: {
     transactionHash: v.string(),
-    status: v.union(v.literal("pending"), v.literal("completed"), v.literal("failed")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("completed"),
+      v.literal("failed"),
+    ),
   },
   handler: async (ctx, args) => {
     const transaction = await ctx.db
       .query("transaction")
-      .withIndex("by_transactionHash", (q) => q.eq("transactionHash", args.transactionHash))
+      .withIndex("by_transactionHash", (q) =>
+        q.eq("transactionHash", args.transactionHash),
+      )
       .unique();
 
     if (!transaction) {
@@ -156,35 +190,49 @@ export const updateDepositStatus = mutation({
 
     // No-op guard — avoid double-credit
     if (transaction.status === args.status) {
-      console.log(`[CONVEX] Status already ${args.status} for ${args.transactionHash} — no-op`);
+      console.log(
+        `[CONVEX] Status already ${args.status} for ${args.transactionHash} — no-op`,
+      );
       return transaction._id;
     }
 
     // Credit user when completing a deposit
-    if (args.status === "completed" && transaction.status !== "completed" && transaction.type === "deposit") {
+    if (
+      args.status === "completed" &&
+      transaction.status !== "completed" &&
+      transaction.type === "deposit"
+    ) {
       const user = await ctx.db.get(transaction.userId);
-      if (!user) throw new Error(`User not found for tx: ${args.transactionHash}`);
+      if (!user)
+        throw new Error(`User not found for tx: ${args.transactionHash}`);
 
       await ctx.db.patch(transaction.userId, {
-        depositAmount:   (user.depositAmount  ?? 0) + transaction.amount,
+        depositAmount: (user.depositAmount ?? 0) + transaction.amount,
         lockedPrincipal: (user.lockedPrincipal ?? 0) + transaction.amount,
         lastDepositCheck: Date.now(),
       });
 
-      console.log(`[CONVEX] Credited $${transaction.amount} to user ${transaction.userId}`);
+      console.log(
+        `[CONVEX] Credited $${transaction.amount} to user ${transaction.userId}`,
+      );
 
       // Referral commissions (18% / 3% / 2% across 3 levels)
       try {
         const RATES = [0.18, 0.03, 0.02];
-        let ancestorId: Id<"user"> | undefined = user.referredBy;
+        let ancestorId: Id<"user"> | undefined = user.referredBy?.find(
+          () => user._id === transaction.userId,
+        );
         for (let level = 0; level < RATES.length && ancestorId; level++) {
           const referrer = await ctx.db.get(ancestorId);
           if (!referrer) break;
           const commission = transaction.amount * RATES[level];
           if (commission > 0) {
-            await ctx.db.patch(ancestorId, { earnings: (referrer.earnings ?? 0) + commission });
-            console.log(`[CONVEX] Referral L${level + 1}: $${commission.toFixed(4)} → ${ancestorId}`);
-            ancestorId = referrer.referredBy;
+            await ctx.db.patch(ancestorId, {
+              earnings: (referrer.earnings ?? 0) + commission,
+            });
+            console.log(
+              `[CONVEX] Referral L${level + 1}: $${commission.toFixed(4)} → ${ancestorId}`,
+            );
           } else {
             break;
           }
@@ -194,7 +242,10 @@ export const updateDepositStatus = mutation({
       }
     }
 
-    await ctx.db.patch(transaction._id, { status: args.status, updatedAt: Date.now() });
+    await ctx.db.patch(transaction._id, {
+      status: args.status,
+      updatedAt: Date.now(),
+    });
     console.log(`[CONVEX] Tx ${args.transactionHash} status → ${args.status}`);
     return transaction._id;
   },
@@ -221,7 +272,10 @@ export const getPendingDeposits = query({
       .query("transaction")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .filter((q) =>
-        q.and(q.eq(q.field("type"), "deposit"), q.eq(q.field("status"), "pending"))
+        q.and(
+          q.eq(q.field("type"), "deposit"),
+          q.eq(q.field("status"), "pending"),
+        ),
       )
       .collect();
   },
@@ -237,15 +291,15 @@ export const getDepositStats = query({
       .collect();
 
     const completed = all.filter((d) => d.status === "completed");
-    const pending   = all.filter((d) => d.status === "pending");
-    const failed    = all.filter((d) => d.status === "failed");
+    const pending = all.filter((d) => d.status === "pending");
+    const failed = all.filter((d) => d.status === "failed");
 
     return {
-      totalDeposits:     all.length,
+      totalDeposits: all.length,
       completedDeposits: completed.length,
-      pendingDeposits:   pending.length,
-      failedDeposits:    failed.length,
-      totalAmount:       completed.reduce((s, d) => s + d.amount, 0),
+      pendingDeposits: pending.length,
+      failedDeposits: failed.length,
+      totalAmount: completed.reduce((s, d) => s + d.amount, 0),
     };
   },
 });
@@ -253,20 +307,26 @@ export const getDepositStats = query({
 export const getDepositByHash = query({
   args: { txHash: v.string() },
   handler: async (ctx, args) => {
-    return ctx.db
-      .query("transaction")
-      .filter((q) => q.eq(q.field("transactionHash"), args.txHash))
-      .first() ?? null;
+    return (
+      ctx.db
+        .query("transaction")
+        .filter((q) => q.eq(q.field("transactionHash"), args.txHash))
+        .first() ?? null
+    );
   },
 });
 
 export const getDepositByTransactionHash = query({
   args: { txHash: v.string() },
   handler: async (ctx, args) => {
-    return ctx.db
-      .query("transaction")
-      .withIndex("by_transactionHash", (q) => q.eq("transactionHash", args.txHash))
-      .unique() ?? null;
+    return (
+      ctx.db
+        .query("transaction")
+        .withIndex("by_transactionHash", (q) =>
+          q.eq("transactionHash", args.txHash),
+        )
+        .unique() ?? null
+    );
   },
 });
 
@@ -280,7 +340,11 @@ export const getDepositByAddress = query({
     for (const user of users) {
       if (!user.depositAddresses) continue;
       if (Object.values(user.depositAddresses).includes(args.address)) {
-        return { userId: user._id, userContact: user.contact, userEmail: user.email };
+        return {
+          userId: user._id,
+          userContact: user.contact,
+          userEmail: user.email,
+        };
       }
     }
     return null;
