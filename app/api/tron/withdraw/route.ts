@@ -44,7 +44,7 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const { amount, network, address, transactionPassword } = body;
+        const { amount, network, address, transactionPass } = body;
 
         if (!amount || !network || !address) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
         }
 
         // Get transaction password from request (can be empty for 24hr bypass)
-        const transactionPassword = body.transactionPassword || "";
+        const transactionPassword = body.transactionPass || "";
 
         // Check if transaction password is locked (within 24 hours of change)
         const isPasswordLocked = await convex.query(api.user.isTransactionPasswordLocked, {
