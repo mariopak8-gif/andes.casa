@@ -16,31 +16,7 @@ export default function Home() {
 
   return (
     <div className="font-montserrat text-gray-800 overflow-x-hidden">
-      {/* Navigation */}
-      <nav className="absolute top-6 left-0 right-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <Link href="/" className="text-white font-bold text-xl tracking-wider">
-            ANDES
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-white/90 hover:text-white">
-              Dashboard
-            </Link>
-            <Link
-              href="/sign-in"
-              className="px-4 py-2 bg-white text-cyan-600 rounded-full font-semibold shadow"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="px-4 py-2 border border-white text-white rounded-full hover:bg-white/10"
-            >
-              Create Account
-            </Link>
-          </div>
-        </div>
-      </nav>
+      
 
       {/* Hero Section */}
       <section
