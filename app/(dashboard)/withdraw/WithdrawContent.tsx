@@ -256,7 +256,7 @@ export default function WithdrawContent() {
   }
 
   return (
-    <main className="bg-gradient-to-br mt-14 from-green-300 via-cyan-200 to-white min-h-screen px-4 py-8 font-montserrat">
+    <main className="bg-gradient-to-br md:mt-14 pb-20 md:pb-0 from-green-300 via-cyan-200 to-white min-h-screen px-4 py-8 font-montserrat">
       <div className="max-w-4xl mx-auto space-y-8">
         {/* Header */}
         <div>

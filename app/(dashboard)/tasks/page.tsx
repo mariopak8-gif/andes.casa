@@ -244,7 +244,7 @@ export default function TasksPage() {
     <main className="font-montserrat text-gray-800 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
       
 
-      <div className="pt-24 px-4 md:px-8 pb-12">
+      <div className="pt-12 md:pt-24 px-4 md:px-8 pb-12">
         <div className="max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-12">

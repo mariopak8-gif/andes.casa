@@ -1,47 +1,22 @@
-'use client';
+"use client";
 
-import { useSession } from 'next-auth/react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { redirect } from 'next/navigation';
-import { useEffect } from 'react';
+import { useSession } from "next-auth/react";
+import Image from "next/image";
+import Link from "next/link";
+import { redirect, useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
- const { data: session, status } = useSession();
+  const { data: session, status } = useSession();
+  const router = useRouter();
   useEffect(() => {
     if (session) {
-      redirect('/dashboard');
+      router.push("/dashboard");
     }
   }, [session]);
-
+  if (status === "loading") return null;
   return (
     <div className="font-montserrat text-gray-800 overflow-x-hidden">
-      {/* Navigation */}
-      <nav className="absolute top-6 left-0 right-0 z-30">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
-          <Link href="/" className="text-white font-bold text-xl tracking-wider">
-            ANDES
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link href="/dashboard" className="text-white/90 hover:text-white">
-              Dashboard
-            </Link>
-            <Link
-              href="/sign-in"
-              className="px-4 py-2 bg-white text-cyan-600 rounded-full font-semibold shadow"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/register"
-              className="px-4 py-2 border border-white text-white rounded-full hover:bg-white/10"
-            >
-              Create Account
-            </Link>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <section
         id="home"
@@ -52,7 +27,7 @@ export default function Home() {
           className="absolute inset-0 opacity-30 pointer-events-none"
           style={{
             backgroundImage: `url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Crect width='100' height='100' fill='none'/%3E%3Ccircle cx='50' cy='50' r='1' fill='white' opacity='0.3'/%3E%3C/svg%3E")`,
-            backgroundSize: '50px 50px',
+            backgroundSize: "50px 50px",
           }}
         />
 
@@ -94,7 +69,10 @@ export default function Home() {
       </section>
 
       {/* Customized Solutions Section */}
-      <section id="solutions" className="py-32 px-[5%] bg-gradient-to-b from-gray-50 to-white relative">
+      <section
+        id="solutions"
+        className="py-32 px-[5%] bg-gradient-to-b from-gray-50 to-white relative"
+      >
         {/* Top Gradient */}
         <div className="absolute top-0 left-0 right-0 h-36 bg-gradient-to-b from-blue-900/5 to-transparent" />
 
@@ -113,26 +91,37 @@ export default function Home() {
 
           {/* Content */}
           <div>
-            <h2 className="font-playfair text-5xl md:text-6xl text-blue-900 mb-8 leading-tight relative inline-block
-                          after:content-[''] after:absolute after:bottom-[-10px] after:left-0 after:w-20 after:h-1 after:bg-cyan-500 after:rounded-full">
+            <h2
+              className="font-playfair text-5xl md:text-6xl text-blue-900 mb-8 leading-tight relative inline-block
+                          after:content-[''] after:absolute after:bottom-[-10px] after:left-0 after:w-20 after:h-1 after:bg-cyan-500 after:rounded-full"
+            >
               Customized solutions
             </h2>
             <p className="text-lg leading-relaxed text-gray-600 mb-8">
-              The city is our most important customer. We look forward to establishing a close relationship with the
-              municipal government and working with them to make short trips as safe and efficient as possible.
+              The city is our most important customer. We look forward to
+              establishing a close relationship with the municipal government
+              and working with them to make short trips as safe and efficient as
+              possible.
             </p>
             <p className="text-base leading-relaxed text-gray-500 mb-10 pl-6 border-l-4 border-cyan-500">
-              We strive to be the most flexible partner possible, which is why we constantly improve our service based
-              on feedback from cities and riders.
+              We strive to be the most flexible partner possible, which is why
+              we constantly improve our service based on feedback from cities
+              and riders.
             </p>
 
             {/* Features Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-12">
               {[
-                { title: 'Smart Scooter Technology', img: '/SmartScooterTechnology.png' },
-                { title: 'Global Network', img: '/GlobalNetwork.png' },
-                { title: 'Safe & Secure Rides', img: '/Safe&SecureRides.jpg' },
-                { title: 'Easy Mobile Access', img: '/SmartScooterTechnology.png' },
+                {
+                  title: "Smart Scooter Technology",
+                  img: "/SmartScooterTechnology.png",
+                },
+                { title: "Global Network", img: "/GlobalNetwork.png" },
+                { title: "Safe & Secure Rides", img: "/Safe&SecureRides.jpg" },
+                {
+                  title: "Easy Mobile Access",
+                  img: "/SmartScooterTechnology.png",
+                },
               ].map((feature, index) => (
                 <div
                   key={index}
@@ -147,7 +136,9 @@ export default function Home() {
                       className="w-full h-full object-cover"
                     />
                   </div>
-                  <div className="text-sm font-medium text-gray-800">{feature.title}</div>
+                  <div className="text-sm font-medium text-gray-800">
+                    {feature.title}
+                  </div>
                 </div>
               ))}
             </div>
@@ -162,7 +153,8 @@ export default function Home() {
             Ready to Join ANDES?
           </h2>
           <p className="text-xl text-gray-100 mb-12 max-w-2xl mx-auto">
-            Start your journey with us today and become part of the global sharing economy revolution.
+            Start your journey with us today and become part of the global
+            sharing economy revolution.
           </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center">
             <Link

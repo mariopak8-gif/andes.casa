@@ -1,3 +1,4 @@
+import BottomNav from "@/components/BottomNav";
 import Navbar from "@/components/dashboard/navbar";
 
 export default function RootLayout({
@@ -9,6 +10,7 @@ export default function RootLayout({
     <main className="min-h-screen flex flex-col">
       <Navbar />
       {children}
+      <BottomNav/>
     </main>
   );
 }
