@@ -5,11 +5,12 @@ import { api } from "@/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [phoneNumber, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+1");
@@ -31,6 +32,16 @@ export default function RegisterPage() {
   const [locationMismatch, setLocationMismatch] = useState<boolean | null>(
     null,
   );
+
+  // Auto-populate invitation code from URL query param (?<code>)
+  React.useEffect(() => {
+    // The URL format is /register?<CODE>, so the code is the first (and only) key
+    // with no value. searchParams.keys() gives us that key.
+    const firstKey = searchParams.keys().next().value;
+    if (firstKey) {
+      setInvitationCode(firstKey);
+    }
+  }, [searchParams]);
 
   // Browser geolocation + reverse geocoding helpers
   const reverseGeocode = async (lat: number, lon: number) => {
@@ -665,8 +676,7 @@ export default function RegisterPage() {
             )}
           </div>
 
-          {/* PIN */}
-
+          {/* Invitation Code */}
           <div className="relative">
             <input
               value={invitationCode}
@@ -678,9 +688,6 @@ export default function RegisterPage() {
               className="w-full px-4 py-3 rounded border-2 bg-[#152a4a] text-white text-sm focus:outline-none"
             />
           </div>
-          {/* <div className="text-center py-4 border-t border-[#2a4a7a]">
-            <span className="text-gray-400 text-sm font-semibold">{generatedPin}</span>
-          </div> */}
 
           {error && (
             <div className="text-red-400 text-sm text-center">{error}</div>
