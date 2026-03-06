@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { AdminSecurityStatus } from '@/components/AdminSecurityStatus';
 
@@ -13,6 +13,7 @@ export default function AdminLayout({
 }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const [isMounted, setIsMounted] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [adminToken, setAdminToken] = useState<string | null>(null);
@@ -21,17 +22,16 @@ export default function AdminLayout({
 
   useEffect(() => {
     setIsMounted(true);
-    // Check for admin token in localStorage
     const token = localStorage.getItem('admin_token');
     if (token) {
       setAdminToken(token);
     }
   }, []);
 
+  // Clear admin token when user navigates away from /admin/* routes
+
   useEffect(() => {
     if (!isMounted) return;
-    
-    // If no admin token and no NextAuth session, redirect to admin login
     if (!adminToken && status !== 'authenticated') {
       router.push('/admin-login');
     }
@@ -39,12 +39,24 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (isMounted && !isAdmin && status !== 'loading') {
-      // If has NextAuth session but not admin role, redirect to dashboard
       if (session && session.user?.role !== 'admin') {
         router.push('/dashboard');
       }
     }
   }, [isMounted, isAdmin, status, session, router]);
+
+  const handleLogout = () => {
+    // Clear admin token from localStorage
+    localStorage.removeItem('admin_token');
+    setAdminToken(null);
+
+    // Also sign out of NextAuth session if one exists
+    if (session) {
+      signOut({ callbackUrl: '/admin-login' });
+    } else {
+      router.push('/admin-login');
+    }
+  };
 
   if (!isMounted || (status === 'loading' && !adminToken)) {
     return (
@@ -87,7 +99,7 @@ export default function AdminLayout({
   return (
     <div className="font-montserrat text-gray-800 flex flex-col lg:flex-row min-h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-gray-900 to-gray-800 text-white fixed lg:relative h-full transition-all duration-300 z-40 shadow-2xl`}>
+      <aside className={`${sidebarOpen ? 'w-64' : 'w-20'} bg-gradient-to-b from-gray-900 to-gray-800 text-white fixed lg:relative h-full transition-all duration-300 z-40 shadow-2xl flex flex-col`}>
         {/* Logo Section */}
         <div className="p-6 border-b border-gray-700 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-red-500 to-pink-500 flex items-center justify-center font-bold text-lg flex-shrink-0">
@@ -118,15 +130,25 @@ export default function AdminLayout({
           </ul>
         </nav>
 
-        {/* User Section */}
-        <div className="p-4 border-t border-gray-700">
+        {/* Bottom Actions */}
+        <div className="p-4 border-t border-gray-700 space-y-2">
+          {/* Back to App */}
           <Link
             href="/dashboard"
             className="flex items-center gap-3 px-4 py-3 rounded-lg bg-gray-700 hover:bg-gray-600 transition font-medium text-sm"
           >
-            <span className="text-lg">←</span>
+            <span className="text-lg flex-shrink-0">←</span>
             {sidebarOpen && <span>Back to App</span>}
           </Link>
+
+          {/* Logout Button */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg bg-red-600 hover:bg-red-700 transition font-medium text-sm text-white"
+          >
+            <span className="text-lg flex-shrink-0">🚪</span>
+            {sidebarOpen && <span>Logout</span>}
+          </button>
         </div>
 
         {/* Sidebar Toggle */}
@@ -156,6 +178,15 @@ export default function AdminLayout({
             </div>
             <span className="font-bold text-gray-900">ANDES Admin</span>
           </div>
+
+          {/* Mobile Logout */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-700 transition text-sm text-white font-medium"
+          >
+            <span>🚪</span>
+            <span>Logout</span>
+          </button>
         </div>
 
         {/* Page Content */}

@@ -23,23 +23,6 @@ export const ADMIN_CREDENTIALS: AdminCredential[] = [
     description: 'Super Administrator',
     active: true,
   },
-  {
-    username: 'admin',
-    secretKey: 'admin-secret-key-456',
-    email: 'admin@andes.com',
-    role: 'admin',
-    description: 'Administrator',
-    active: true,
-  },
-  // ADD YOUR ADMIN CREDENTIALS HERE:
-  // {
-  //   username: 'your-username',
-  //   secretKey: 'your-secret-key',
-  //   email: 'your-email@example.com',
-  //   role: 'admin',
-  //   description: 'Your Admin Account',
-  //   active: true,
-  // },
 ];
 
 /**

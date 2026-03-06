@@ -188,31 +188,7 @@ const NavigationContent = () => {
                     {" "}
                     Dashboard
                   </Link>
-                  {user?.role === 'admin' && (
-                    <>
-                      <Link
-                        href="/admin/hot-wallet"
-                        onClick={() => setIsOpen(false)}
-                        className="text-gray-800"
-                      >
-                        Hot Wallet
-                      </Link>
-                      <Link
-                        href="/admin/audit-funds"
-                        onClick={() => setIsOpen(false)}
-                        className="text-gray-800"
-                      >
-                        Fund Audit
-                      </Link>
-                      <Link
-                        href="/admin/external-transfer"
-                        onClick={() => setIsOpen(false)}
-                        className="text-gray-800"
-                      >
-                        External Transfer
-                      </Link>
-                    </>
-                  )}
+                 
                   <button
                     onClick={() =>
                       signOut({ redirect: true, callbackUrl: "/" })

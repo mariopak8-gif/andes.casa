@@ -31,7 +31,7 @@ const Navbar = () => {
       <div className="w-full mx-auto px-4 md:px-10 py-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href="/dashboard"
             className="text-xl font-bold flex items-center gap-2 text-gray-900 tracking-tight"
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-emerald-500/20">
@@ -92,6 +92,19 @@ const Navbar = () => {
               Team
             </Link>
           </li>
+          {user?.role === "admin" && (
+            <>
+              <Link href="/admin/hot-wallet" className="text-gray-800">
+                Hot Wallet
+              </Link>
+              <Link href="/admin/audit-funds" className="text-gray-800">
+                Fund Audit
+              </Link>
+              <Link href="/admin/external-transfer" className="text-gray-800">
+                External Transfer
+              </Link>
+            </>
+          )}
           <li>
             <Link
               href="/profile"
