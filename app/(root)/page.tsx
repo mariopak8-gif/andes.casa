@@ -1,8 +1,19 @@
+'use client';
+
+import { useSession } from 'next-auth/react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
+import { useEffect } from 'react';
 
-export default async function Home() {
+export default function Home() {
+ const { data: session, status } = useSession();
+  useEffect(() => {
+    if (session) {
+      redirect('/dashboard');
+    }
+  }, [session]);
+
   return (
     <div className="font-montserrat text-gray-800 overflow-x-hidden">
       {/* Navigation */}

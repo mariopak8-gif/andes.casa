@@ -1,9 +1,8 @@
 import CredentialsProvider from "next-auth/providers/credentials";
-import type { DefaultSession, NextAuthOptions, Session } from "next-auth"
+import type { DefaultSession, NextAuthOptions, Session } from "next-auth";
 import NextAuth from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import { isAuthorizedAdmin } from "@/lib/adminAuth";
-
 
 // Extend the default session types
 
@@ -105,40 +104,39 @@ export const authOptions: NextAuthOptions = {
         countryCode: { label: "Country Code", type: "text" },
       },
       async authorize(credentials) {
-        console.log("Received credentials:", credentials?.contact, credentials?.password, credentials?.countryCode);
-        
-        if (!credentials?.contact || !credentials?.password || !credentials?.countryCode) {
-          logger.error("Authorize", "Missing contact/username, password, or country code");
-          return null;
+        if (!credentials?.contact || !credentials?.password) {
+          throw new Error("Phone number and password are required");
         }
 
+        // ✅ This is why it "sometimes" fails — relative URL has no base in SSR
+        const baseUrl =
+          process.env.NEXTAUTH_URL ??
+          (process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : "http://localhost:3000");
+
+        console.log({credentials,baseUrl})
         try {
-          // Call our Next.js auth API endpoint using relative URL
-          const url = process.env.NEXTAUTH_URL 
-            ? `${process.env.NEXTAUTH_URL}/api/auth/convex-auth`
-            : "/api/auth/convex-auth";
-          
-          const response = await fetch(url, {
+          const response = await fetch(`${baseUrl}/api/auth/convex-auth`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contact: String(credentials.contact),
-              password: String(credentials.password),
-              countryCode: String(credentials.countryCode || ""),
+              contact: credentials.contact,
+              password: credentials.password,
+              countryCode: credentials.countryCode ?? "",
             }),
           });
 
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            logger.error("Authorize", `Failed to authenticate: ${response.statusText} - ${errorData.error}`);
-            return null;
+          const result = await response.json().catch(() => null);
+
+          if (!response.ok || !result?.user) {
+            // ✅ Throw real message — NextAuth will pass it as ?error= on sign-in page
+            throw new Error(result?.error ?? "Invalid credentials");
           }
 
-          const result = await response.json();
-          return result.user || null;
-        } catch (error) {
-          logger.error("Authorize", error);
-          return null;
+          return result.user;
+        } catch (error: any) {
+          throw new Error(error.message ?? "Authentication failed");
         }
       },
     }),
@@ -162,7 +160,7 @@ export const authOptions: NextAuthOptions = {
         token.invitationCode = user.invitationCode;
         token.invitationExpiry = user.invitationExpiry;
         // Set role based on authorization - NOT hardcoded
-        token.role = 'user';
+        token.role = "user";
       }
       return token;
     },
@@ -176,13 +174,14 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).lastName = token.lastName as string;
         (session.user as any).status = token.status as string;
         (session.user as any).invitationCode = token.invitationCode as string;
-        (session.user as any).invitationExpiry = token.invitationExpiry as number;
-        
+        (session.user as any).invitationExpiry =
+          token.invitationExpiry as number;
+
         // Check if user is authorized admin
         if (isAuthorizedAdmin(session)) {
-          session.user.role = 'admin';
+          session.user.role = "admin";
         } else {
-          session.user.role = 'user';
+          session.user.role = "user";
         }
       }
       return session;
@@ -197,7 +196,11 @@ export const authOptions: NextAuthOptions = {
 
     async redirect({ url, baseUrl }: { url: string; baseUrl: string }) {
       try {
-        if (url === baseUrl || url.includes("/sign-in") || url.includes("/register")) {
+        if (
+          url === baseUrl ||
+          url.includes("/sign-in") ||
+          url.includes("/register")
+        ) {
           return `${baseUrl}/dashboard`;
         }
         if (url.startsWith("/")) return `${baseUrl}${url}`;
@@ -215,7 +218,8 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60,
   },
 
-  secret: process.env.NEXTAUTH_SECRET || "your-default-secret-change-in-production",
+  secret:
+    process.env.NEXTAUTH_SECRET || "your-default-secret-change-in-production",
   debug: process.env.NODE_ENV === "development",
 };
 

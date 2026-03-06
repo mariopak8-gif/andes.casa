@@ -275,14 +275,6 @@ export default function RegisterPage() {
         return;
       }
 
-      // ✅ Run referral update independently of the success branch
-      if (invitationCode && lookForInvitationCode) {
-        await updateUser({
-          userId: lookForInvitationCode._id,
-          referredBy: [result.userId], // ✅ array of the newly registered user's ID
-        });
-      }
-
       // On success, navigate to sign-in page
       router.push("/sign-in");
     } catch (err: any) {

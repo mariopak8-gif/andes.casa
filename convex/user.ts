@@ -5,6 +5,50 @@ import { api } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 
 /**
+ * Authenticate user - verifies password in Convex runtime (same hash as registration)
+ * Returns safe user data only, never the password hash
+ */
+export const authenticateUser = query({
+  args: {
+    contact: v.string(),
+    password: v.string(),
+  },
+  handler: async (ctx, args) => {
+    console.log({args});
+    const user = await ctx.db
+      .query("user")
+      .withIndex("by_contact", (q) => q.eq("contact", args.contact))
+      .first();
+
+    if (!user || !user.password) {
+      return { success: false, error: "Invalid credentials" };
+    }
+   
+    // ✅ Hash runs in Convex runtime — SAME engine that registered the user
+    const hashedInput = simpleHash(args.password);
+    console.log({hashedInput, userPassword: user.password});
+    if (hashedInput !== user.password) {
+      return { success: false, error: "Invalid credentials" };
+    }
+
+    // ✅ Never return password hash to client
+    return {
+      success: true,
+      user: {
+        id: user._id,
+        contact: user.contact,
+        email: user.email,
+        countryCode: user.countryCode,
+        role: user.role || "client",
+        invitationCode: user.invitationCode || "",
+        invitationExpiry: user.invitationExpiry,
+      },
+    };
+  },
+});
+
+
+/**
  * Simple custom hash function for Convex (synchronous, no setTimeout)
  * Not for production - use bcryptjs on client side for registration
  */
@@ -159,22 +203,28 @@ export const registerUser = mutation({
   },
   handler: async (ctx, args) => {
     try {
-      // Validate passwords match
       if (args.password !== args.confirmPassword) {
-        return {
-          success: false,
-          error: "Passwords do not match",
-        };
+        return { success: false, error: "Passwords do not match" };
       }
 
-      // Hash passwords using simple custom hash to avoid setTimeout issues in Convex
       const hashedPassword = simpleHash(args.password);
       const hashedTxPassword = simpleHash(args.transactionPassword);
-
-      // Generate invitation code for this user
       const userInvitationCode = generateInvitationCode();
 
-      // Create the user directly
+      // ✅ Look up who referred this user
+      let referredBy: Id<"user">[] = [];
+      if (args.invitationCode) {
+        const referrer = await ctx.db
+          .query("user")
+          .withIndex("by_InvitationCode", (q) =>
+            q.eq("invitationCode", args.invitationCode!)
+          )
+          .first();
+        if (referrer) {
+          referredBy = [referrer._id]; // new user points to their referrer
+        }
+      }
+
       const userId = await ctx.db.insert("user", {
         contact: args.contact,
         email: args.email,
@@ -183,7 +233,7 @@ export const registerUser = mutation({
         countryCode: args.countryCode,
         invitationCode: userInvitationCode,
         telegram: args.telegram,
-        referredBy: undefined, // TODO: Implement referral lookup if needed
+        referredBy,           // ✅ [referrerId] or [] if no code
         depositAmount: 0,
         earnings: 0,
         investedCapital: 0,
@@ -191,17 +241,9 @@ export const registerUser = mutation({
         role: "client",
       } as any);
 
-      return {
-        success: true,
-        userId: userId,
-        invitationCode: userInvitationCode,
-      };
+      return { success: true, userId, invitationCode: userInvitationCode };
     } catch (error: any) {
-      console.error("Registration error:", error);
-      return {
-        success: false,
-        error: error?.message || "Registration failed",
-      };
+      return { success: false, error: error?.message || "Registration failed" };
     }
   },
 });

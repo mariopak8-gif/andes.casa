@@ -7,7 +7,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <main>
+    <main suppressHydrationWarning>
       <Navigation />
 
       {children}

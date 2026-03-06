@@ -197,6 +197,7 @@ export const updateDepositStatus = mutation({
     }
 
     // Credit user when completing a deposit
+    // Replace the broken referral block with this:
     if (
       args.status === "completed" &&
       transaction.status !== "completed" &&
@@ -212,33 +213,35 @@ export const updateDepositStatus = mutation({
         lastDepositCheck: Date.now(),
       });
 
-      console.log(
-        `[CONVEX] Credited $${transaction.amount} to user ${transaction.userId}`,
-      );
+      // ✅ Walk UP the referral chain: L1=18%, L2=3%, L3=2%
+      const RATES = [0.18, 0.03, 0.02];
+      let currentUserId: Id<"user"> = transaction.userId;
 
-      // Referral commissions (18% / 3% / 2% across 3 levels)
-      try {
-        const RATES = [0.18, 0.03, 0.02];
-        let ancestorId: Id<"user"> | undefined = user.referredBy?.find(
-          () => user._id === transaction.userId,
+      for (let level = 0; level < RATES.length; level++) {
+        // get the current node's user to find who referred THEM
+        const currentUser = await ctx.db.get(currentUserId);
+        if (
+          !currentUser ||
+          !currentUser.referredBy ||
+          currentUser.referredBy.length === 0
+        )
+          break;
+
+        const referrerId = currentUser.referredBy[0]; // always 1 referrer per user
+        const referrer = await ctx.db.get(referrerId);
+        if (!referrer) break;
+
+        const commission = transaction.amount * RATES[level];
+        await ctx.db.patch(referrerId, {
+          earnings: (referrer.earnings ?? 0) + commission,
+        });
+
+        console.log(
+          `[CONVEX] Referral L${level + 1}: $${commission.toFixed(4)} → ${referrerId} (${referrer.contact})`,
         );
-        for (let level = 0; level < RATES.length && ancestorId; level++) {
-          const referrer = await ctx.db.get(ancestorId);
-          if (!referrer) break;
-          const commission = transaction.amount * RATES[level];
-          if (commission > 0) {
-            await ctx.db.patch(ancestorId, {
-              earnings: (referrer.earnings ?? 0) + commission,
-            });
-            console.log(
-              `[CONVEX] Referral L${level + 1}: $${commission.toFixed(4)} → ${ancestorId}`,
-            );
-          } else {
-            break;
-          }
-        }
-      } catch (e) {
-        console.error("[CONVEX] Referral commission error:", e);
+
+        // move up to the next ancestor
+        currentUserId = referrerId;
       }
     }
 
