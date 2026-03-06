@@ -72,7 +72,7 @@ const ProfileIcon = ({ active }: { active: boolean }) => (
 )
 
 const navItems = [
-  { href: '/',         label: 'Home',    Icon: HomeIcon },
+  { href: '/dashboard',         label: 'Home',    Icon: HomeIcon },
   { href: '/tasks',     label: 'Task',    Icon: TaskIcon },
   { href: '/team',     label: 'Team',    Icon: TeamIcon },
   { href: '/profile',  label: 'Profile', Icon: ProfileIcon },

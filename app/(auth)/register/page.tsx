@@ -1,14 +1,12 @@
 "use client";
 
-import React, { useState } from "react";
-import { useAction, useMutation, useQuery } from "convex/react";
-import { api } from "@/convex/_generated/api";
-import SupportChat from "@/components/SupportChat";
-import { useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
-import Link from "next/link";
 import { ALLOWED_COUNTRY_CODES } from "@/constants/countryCodes";
+import { api } from "@/convex/_generated/api";
+import { useMutation, useQuery } from "convex/react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import React, { useState } from "react";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -285,76 +283,8 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#1a2a4a] flex flex-col items-center justify-start pt-8 p-6">
+    <div className="min-h-screen bg-[#1a2a4a] flex flex-col items-center justify-center pb-10">
       <div className="w-full max-w-md mt-20">
-        <div className="bg-[#0f1f3a] rounded-t-lg p-4 border border-[#2a4a7a]">
-          <div className="flex items-center justify-between">
-            {/* Menu Icon */}
-            <button
-              type="button"
-              className="flex items-center justify-center w-8 h-8 bg-green-400 rounded-full hover:bg-green-500 transition-colors"
-              title="Menu"
-            >
-              <svg
-                className="w-5 h-5 text-white"
-                fill="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path d="M3 6h18v2H3V6zm0 5h18v2H3v-2zm0 5h18v2H3v-2z" />
-              </svg>
-            </button>
-            <label className="text-white text-sm font-semibold flex-1 text-center mx-2 border border-green-400 rounded px-3 py-1">
-              Language selection
-            </label>
-            <div className="flex items-center gap-3">
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="bg-[#1a3a5a] text-white px-3 py-1 rounded text-sm border border-[#2a4a7a] cursor-pointer"
-              >
-                <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-              </select>
-              {/* Telegram Icon */}
-              <a
-                href="https://t.me/andes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center w-8 h-8 bg-blue-500 rounded-full hover:bg-blue-600 transition-colors"
-                title="Telegram"
-              >
-                <svg
-                  className="w-5 h-5 text-white"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M23.91 3.79L20.3 20.84c-.25 1.1-.98 1.37-1.98.85l-5.5-4.07-2.65 2.55c-.3.3-.55.56-1.12.56-.73 0-.6-.27-.84-.95L6.3 13.3 1.07 11.5c-.96-.3-1.36-.93-.14-1.43l21.26-8.2c.97-.43 1.9.24 1.57 1.91z" />
-                </svg>
-              </a>
-              {/* YouTube Icon */}
-              <a
-                href="https://youtube.com/andes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center w-8 h-8 bg-red-600 rounded-full hover:bg-red-700 transition-colors"
-                title="YouTube"
-              >
-                <svg
-                  className="w-5 h-5 text-white"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                </svg>
-              </a>
-            </div>
-          </div>
-        </div>
-
         <h1 className="text-white text-3xl font-bold text-center py-6 bg-[#0f1f3a] border-x border-[#2a4a7a]">
           Register
         </h1>
@@ -368,12 +298,7 @@ export default function RegisterPage() {
             <div className="flex items-center gap-2">
               <select
                 value={countryCode}
-                onChange={(e) => {
-                  const newCode = e.target.value;
-                  setCountryCode(newCode);
-                  // revalidate phone with new code
-                  if (phoneNumber) validatePhone(phoneNumber);
-                }}
+                onChange={(e) => setCountryCode(e.target.value)}
                 className={`px-3 py-3 rounded border-2 bg-[#152a4a] text-white text-sm focus:outline-none min-w-20 ${
                   countryCode && countryCode !== ""
                     ? "border-green-500"
@@ -626,32 +551,17 @@ export default function RegisterPage() {
               <input
                 value={phoneNumber}
                 onChange={(e) => {
-                  const v = e.target.value;
-                  setPhoneNumber(v);
-                  validatePhone(v);
+                  setPhoneNumber(e.target.value);
+                  validatePhone(e.target.value);
                 }}
                 placeholder="Please enter mobile phone number"
                 type="tel"
-                className={`flex-1 px-4 py-3 rounded border-2 bg-[#152a4a] text-white placeholder-gray-500 text-sm focus:outline-none ${
+                className={`flex-1 px-4 py-3 rounded border-2 bg-[#152a4a] text-white placeholder-red-400 text-sm focus:outline-none ${
                   phoneNumber && phoneValid === true
                     ? "border-green-500"
-                    : phoneNumber
-                      ? "border-red-500"
-                      : "border-gray-500"
+                    : "border-red-500"
                 }`}
               />
-              <span className="text-red-500 font-bold text-lg">1</span>
-              {phoneValid === false && (
-                <p className="text-red-400 text-xs mt-1 absolute left-0 top-full">
-                  Enter a valid phone number.
-                </p>
-              )}
-              {locationMismatch === true && (
-                <p className="text-yellow-300 text-xs mt-1 absolute left-0 top-full">
-                  Detected location {locationCountry} does not match phone
-                  country {phoneCountryDetected}.
-                </p>
-              )}
             </div>
           </div>
 
@@ -702,9 +612,6 @@ export default function RegisterPage() {
                     : "border-gray-500"
               }`}
             />
-            <span className="absolute right-4 top-3 text-red-500 font-bold text-lg">
-              2
-            </span>
           </div>
 
           {/* Confirm Password */}
@@ -750,9 +657,7 @@ export default function RegisterPage() {
                     : "border-gray-500"
               }`}
             />
-            <span className="absolute right-4 top-3 text-red-500 font-bold text-lg">
-              3
-            </span>
+
             {txPasswordValid === false && (
               <p className="text-red-400 text-xs mt-1">
                 Transaction password must be at least 6 characters.
@@ -799,8 +704,6 @@ export default function RegisterPage() {
           </Link>
         </form>
       </div>
-
-      <SupportChat />
     </div>
   );
 }

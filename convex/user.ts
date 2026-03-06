@@ -14,7 +14,7 @@ export const authenticateUser = query({
     password: v.string(),
   },
   handler: async (ctx, args) => {
-    console.log({args});
+    console.log({ args });
     const user = await ctx.db
       .query("user")
       .withIndex("by_contact", (q) => q.eq("contact", args.contact))
@@ -23,10 +23,10 @@ export const authenticateUser = query({
     if (!user || !user.password) {
       return { success: false, error: "Invalid credentials" };
     }
-   
+
     // ✅ Hash runs in Convex runtime — SAME engine that registered the user
     const hashedInput = simpleHash(args.password);
-    console.log({hashedInput, userPassword: user.password});
+    console.log({ hashedInput, userPassword: user.password });
     if (hashedInput !== user.password) {
       return { success: false, error: "Invalid credentials" };
     }
@@ -47,6 +47,64 @@ export const authenticateUser = query({
   },
 });
 
+// convex/user.ts — add this query
+export const getWithdrawPageData = query({
+  args: { contact: v.string() },
+  handler: async (ctx, args) => {
+    if (!args.contact) return null;
+
+    const user = await ctx.db
+      .query("user")
+      .withIndex("by_contact", (q) => q.eq("contact", args.contact))
+      .first();
+
+    if (!user) return null;
+
+    const now = Date.now();
+    const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+    // Password bypass (forgot password 24h window)
+    const forgottenAt = user.passwordForgottenAt;
+    const canBypassPassword = forgottenAt
+      ? now - forgottenAt >= TWENTY_FOUR_HOURS
+      : false;
+    const bypassTimeRemaining = forgottenAt
+      ? Math.max(0, TWENTY_FOUR_HOURS - (now - forgottenAt))
+      : null;
+
+    // Transaction password lock (after reset)
+    const changedAt = user.transactionPasswordChangedAt;
+    const isPasswordLocked = changedAt
+      ? now - changedAt < TWENTY_FOUR_HOURS
+      : false;
+    const lockTimeRemaining = changedAt
+      ? Math.max(0, TWENTY_FOUR_HOURS - (now - changedAt))
+      : null;
+
+    // Recent withdrawals
+    const withdrawals = await ctx.db
+      .query("transaction")
+      .withIndex("by_userId", (q) => q.eq("userId", user._id))
+      .filter((q) => q.eq(q.field("type"), "withdrawal"))
+      .order("desc")
+      .take(20);
+
+    return {
+      user: {
+        _id: user._id,
+        contact: user.contact,
+        earnings: user.earnings ?? 0,
+        depositAmount: user.depositAmount ?? 0,
+        lockedPrincipal: user.lockedPrincipal ?? 0,
+      },
+      canBypassPassword,
+      bypassTimeRemaining,
+      isPasswordLocked,
+      lockTimeRemaining,
+      withdrawals,
+    };
+  },
+});
 
 /**
  * Simple custom hash function for Convex (synchronous, no setTimeout)
@@ -56,11 +114,11 @@ function simpleHash(input: string): string {
   let hash = 0;
   for (let i = 0; i < input.length; i++) {
     const char = input.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
+    hash = (hash << 5) - hash + char;
     hash = hash & hash; // Convert to 32bit integer
   }
   // Convert to hex string
-  return Math.abs(hash).toString(16).padStart(8, '0');
+  return Math.abs(hash).toString(16).padStart(8, "0");
 }
 
 /**
@@ -76,11 +134,12 @@ function generateInvitationCode(): string {
 export const getUserByInvitationCode = query({
   args: { invitationCde: v.string() },
   handler: async (ctx, args) => {
-   return await ctx.db
+    return await ctx.db
       .query("user")
-      .withIndex('by_InvitationCode', (q) => q.eq("invitationCode", args.invitationCde)) 
+      .withIndex("by_InvitationCode", (q) =>
+        q.eq("invitationCode", args.invitationCde),
+      )
       .first();
-
   },
 });
 export const getUserByContact = query({
@@ -113,7 +172,9 @@ export const getAllUsersWithDepositAddresses = query({
   args: {},
   handler: async (ctx) => {
     const users = await ctx.db.query("user").collect();
-    return users.filter((u) => u.depositAddresses && Object.keys(u.depositAddresses).length > 0);
+    return users.filter(
+      (u) => u.depositAddresses && Object.keys(u.depositAddresses).length > 0,
+    );
   },
 });
 
@@ -179,7 +240,7 @@ export const updateUserBalance = mutation({
     const { userId, ...fields } = args;
 
     const updateData = Object.fromEntries(
-      Object.entries(fields).filter(([_, v]) => v !== undefined)
+      Object.entries(fields).filter(([_, v]) => v !== undefined),
     );
 
     await ctx.db.patch(userId, updateData);
@@ -217,7 +278,7 @@ export const registerUser = mutation({
         const referrer = await ctx.db
           .query("user")
           .withIndex("by_InvitationCode", (q) =>
-            q.eq("invitationCode", args.invitationCode!)
+            q.eq("invitationCode", args.invitationCode!),
           )
           .first();
         if (referrer) {
@@ -233,7 +294,7 @@ export const registerUser = mutation({
         countryCode: args.countryCode,
         invitationCode: userInvitationCode,
         telegram: args.telegram,
-        referredBy,           // ✅ [referrerId] or [] if no code
+        referredBy, // ✅ [referrerId] or [] if no code
         depositAmount: 0,
         earnings: 0,
         investedCapital: 0,
@@ -292,12 +353,13 @@ export const verifyTransactionPassword = query({
  * Generate a secure reset token
  */
 function generateResetToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
+  const chars =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let token = "";
   for (let i = 0; i < 48; i++) {
     token += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return token + '-' + Date.now().toString(36);
+  return token + "-" + Date.now().toString(36);
 }
 
 /**
@@ -445,7 +507,8 @@ export const _performPasswordReset = mutation({
       if (Date.now() > tokenExpiry) {
         return {
           success: false,
-          error: "Reset token has expired. Please request a new password reset.",
+          error:
+            "Reset token has expired. Please request a new password reset.",
         };
       }
 
@@ -482,14 +545,20 @@ export const resetPassword = action({
     resetToken: v.string(),
     newPassword: v.string(),
   },
-  handler: async (ctx, args): Promise<{ success: boolean; message?: string; error?: string }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
       // Call the internal mutation to perform password reset
-      const result: any = await ctx.runMutation(api.user._performPasswordReset, {
-        email: args.email,
-        resetToken: args.resetToken,
-        newPassword: args.newPassword,
-      });
+      const result: any = await ctx.runMutation(
+        api.user._performPasswordReset,
+        {
+          email: args.email,
+          resetToken: args.resetToken,
+          newPassword: args.newPassword,
+        },
+      );
 
       return result;
     } catch (error: any) {
@@ -540,7 +609,8 @@ export const _performTransactionPasswordReset = mutation({
       if (Date.now() > tokenExpiry) {
         return {
           success: false,
-          error: "Reset token has expired. Please request a new password reset.",
+          error:
+            "Reset token has expired. Please request a new password reset.",
         };
       }
 
@@ -578,14 +648,20 @@ export const resetTransactionPassword = action({
     resetToken: v.string(),
     newTransactionPassword: v.string(),
   },
-  handler: async (ctx, args): Promise<{ success: boolean; message?: string; error?: string }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ success: boolean; message?: string; error?: string }> => {
     try {
       // Call the internal mutation to perform transaction password reset
-      const result: any = await ctx.runMutation(api.user._performTransactionPasswordReset, {
-        email: args.email,
-        resetToken: args.resetToken,
-        newTransactionPassword: args.newTransactionPassword,
-      });
+      const result: any = await ctx.runMutation(
+        api.user._performTransactionPasswordReset,
+        {
+          email: args.email,
+          resetToken: args.resetToken,
+          newTransactionPassword: args.newTransactionPassword,
+        },
+      );
 
       return result;
     } catch (error: any) {
@@ -639,7 +715,8 @@ export const markPasswordForgotten = mutation({
 
       return {
         success: true,
-        message: "Password marked as forgotten. You can withdraw after 24 hours without entering a password.",
+        message:
+          "Password marked as forgotten. You can withdraw after 24 hours without entering a password.",
       };
     } catch (error: any) {
       console.error("Mark password forgotten error:", error);
@@ -796,11 +873,11 @@ export const deductUserDepositForTransfer = mutation({
 
     const currentDeposit = user.depositAmount || 0;
     const currentTransferred = user.transferredOut || 0;
-    
+
     // Deduct from deposit
     const newDeposit = Math.max(0, currentDeposit - args.deductionAmount);
     const actualDeduction = currentDeposit - newDeposit;
-    
+
     // Track the transfer
     const newTransferred = currentTransferred + actualDeduction;
 
@@ -809,7 +886,9 @@ export const deductUserDepositForTransfer = mutation({
       transferredOut: newTransferred,
     });
 
-    console.log(`[CONVEX] User ${args.userId} transfer: Deposit $${currentDeposit} → $${newDeposit}, Transferred +$${actualDeduction}`);
+    console.log(
+      `[CONVEX] User ${args.userId} transfer: Deposit $${currentDeposit} → $${newDeposit}, Transferred +$${actualDeduction}`,
+    );
 
     return {
       userId: args.userId,

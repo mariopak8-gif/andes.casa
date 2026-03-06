@@ -230,13 +230,18 @@ export default function TasksPage() {
   }
 
   const grades = [
-    { grade: 'A1', equipment: 20, daily: 2, monthly: 60, annual: 730, color: 'blue', durationHours: taskDurations['A1'] || 24 },
-    { grade: 'A2', equipment: 100, daily: 6.6, monthly: 198, annual: 2409, color: 'blue', durationHours: taskDurations['A2'] || 48 },
-    { grade: 'A3', equipment: 380, daily: 25, monthly: 750, annual: 9125, color: 'blue', durationHours: taskDurations['A3'] || 72 },
-    { grade: 'B1', equipment: 780, daily: 52, monthly: 1560, annual: 18980, color: 'green', durationHours: taskDurations['B1'] || 96 },
-    { grade: 'B2', equipment: 1800, daily: 120, monthly: 3600, annual: 43800, color: 'green', durationHours: taskDurations['B2'] || 120 },
-    { grade: 'B3', equipment: 4800, daily: 320, monthly: 9600, annual: 116800, color: 'green', durationHours: taskDurations['B3'] || 144 },
-  ];
+  { grade: 'A1', equipment: 20,     daily: 2,      monthly: 60,     annual: 730,       color: 'blue',   durationHours: taskDurations['A1'] || 24  },
+  { grade: 'A2', equipment: 100,    daily: 6.6,    monthly: 198,    annual: 2409,      color: 'blue',   durationHours: taskDurations['A2'] || 48  },
+  { grade: 'A3', equipment: 380,    daily: 25,     monthly: 750,    annual: 9125,      color: 'blue',   durationHours: taskDurations['A3'] || 72  },
+  { grade: 'B1', equipment: 780,    daily: 52,     monthly: 1560,   annual: 18980,     color: 'green',  durationHours: taskDurations['B1'] || 96  },
+  { grade: 'B2', equipment: 1800,   daily: 120,    monthly: 3600,   annual: 43800,     color: 'green',  durationHours: taskDurations['B2'] || 120 },
+  { grade: 'B3', equipment: 4800,   daily: 320,    monthly: 9600,   annual: 116800,    color: 'green',  durationHours: taskDurations['B3'] || 144 },
+  { grade: 'S1', equipment: 12800,  daily: 853,    monthly: 25590,  annual: 311345,    color: 'teal',   durationHours: taskDurations['S1'] || 168 },
+  { grade: 'S2', equipment: 25800,  daily: 1720,   monthly: 51600,  annual: 627800,    color: 'teal',   durationHours: taskDurations['S2'] || 192 },
+  { grade: 'S3', equipment: 58000,  daily: 3850,   monthly: 115500, annual: 1405250,   color: 'teal',   durationHours: taskDurations['S3'] || 216 },
+  { grade: 'SS', equipment: 128000, daily: 8530,   monthly: 255900, annual: 3113450,   color: 'gold',   durationHours: taskDurations['SS'] || 240 },
+  { grade: 'SSS',equipment: 280000, daily: 18600,  monthly: 558000, annual: 6789000,   color: 'gold',   durationHours: taskDurations['SSS'] || 264 },
+];
 
   const activeTaskCount = Object.keys(activeTasks).length;
 
@@ -256,9 +261,7 @@ export default function TasksPage() {
           <div className={`mb-8 rounded-2xl border p-4 ${isWithinTaskWindow ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'}`}>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className={`font-bold text-lg ${isWithinTaskWindow ? 'text-emerald-900' : 'text-amber-900'}`}>
-                  {isWithinTaskWindow ? '✓ Task Window Open' : '⏰ Task Window Closed'}
-                </h3>
+                
                 {isWithinTaskWindow && (
                   <p className={`text-sm mt-1 ${isWithinTaskWindow ? 'text-emerald-700' : 'text-amber-700'}`}>
                     Available: <span className="font-semibold">{taskStartHour}:00 - {taskEndHour}:00 {taskTimeZone}</span>
@@ -764,17 +767,7 @@ function TaskCard({ item, durationHours, userBalance, isWithinTaskWindow, timeWi
           </span>
         </div>
 
-        {/* Time Window Status */}
-        <div className={`mb-4 rounded-lg p-3 border ${isWithinTaskWindow ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
-          <div className={`text-xs font-semibold ${isWithinTaskWindow ? 'text-emerald-600' : 'text-red-600'}`}>
-            {isWithinTaskWindow ? '✓ Task Window Open' : '✗ Task Window Closed'}
-          </div>
-          {isWithinTaskWindow && (
-            <div className={`text-xs mt-1 font-semibold ${isWithinTaskWindow ? 'text-emerald-700' : 'text-red-700'}`}>
-              {taskStartHour}:00 - {taskEndHour}:00 {taskTimeZone}
-            </div>
-          )}
-        </div>
+       
 
         {/* Info Rows */}
         <div className="space-y-3 mb-6 pb-6 border-b border-gray-100">

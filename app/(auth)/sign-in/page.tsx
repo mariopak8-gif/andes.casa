@@ -3,26 +3,29 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import SupportChat from "@/components/SupportChat";
 import { ALLOWED_COUNTRY_CODES } from "@/constants/countryCodes";
-import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { parsePhoneNumberFromString } from "libphonenumber-js";
 export default function SignInPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+1");
   const [password, setPassword] = useState("");
   const [language, setLanguage] = useState("en");
   const [locationCountry, setLocationCountry] = useState<string | null>(null);
-  const [phoneCountryDetected, setPhoneCountryDetected] = useState<string | null>(null);
+  const [phoneCountryDetected, setPhoneCountryDetected] = useState<
+    string | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Validation states
-  const [locationMismatch, setLocationMismatch] = useState<boolean | null>(null);
+  const [locationMismatch, setLocationMismatch] = useState<boolean | null>(
+    null,
+  );
 
   // Browser geolocation + reverse geocoding helpers
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
       const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
       );
       if (!res.ok) return null;
       const json = await res.json();
@@ -35,15 +38,20 @@ export default function SignInPage() {
 
   const getCurrentPositionAsync = () =>
     new Promise<GeolocationPosition>((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 10000 })
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        timeout: 10000,
+      }),
     );
 
   React.useEffect(() => {
     (async () => {
-      if (typeof window !== "undefined" && 'geolocation' in navigator) {
+      if (typeof window !== "undefined" && "geolocation" in navigator) {
         try {
           const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          const cc = await reverseGeocode(
+            pos.coords.latitude,
+            pos.coords.longitude,
+          );
           if (cc) setLocationCountry(cc);
         } catch (err) {
           // ignore; fallback to IP lookup on submit
@@ -87,10 +95,17 @@ export default function SignInPage() {
       }
 
       // If still no country, try browser geolocation as a last resort
-      if (!locationCountry && typeof window !== "undefined" && 'geolocation' in navigator) {
+      if (
+        !locationCountry &&
+        typeof window !== "undefined" &&
+        "geolocation" in navigator
+      ) {
         try {
           const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(pos.coords.latitude, pos.coords.longitude);
+          const cc = await reverseGeocode(
+            pos.coords.latitude,
+            pos.coords.longitude,
+          );
           if (cc) setLocationCountry(cc);
         } catch (e) {
           // ignore
@@ -111,8 +126,8 @@ export default function SignInPage() {
     if (!ALLOWED_COUNTRY_CODES.includes(countryCode))
       return setError("Unsupported country code");
     const parsed = parsePhoneNumberFromString(`${countryCode}${phoneNumber}`);
-    if (!parsed || parsed.countryCallingCode !== countryCode.replace('+','')) {
-      return setError('Phone number does not match country code');
+    if (!parsed || parsed.countryCallingCode !== countryCode.replace("+", "")) {
+      return setError("Phone number does not match country code");
     }
 
     // set mismatch flag if we can
@@ -154,61 +169,8 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#1a2a4a] flex flex-col items-center justify-start pt-8 p-6">
+    <div className="min-h-screen bg-[#1a2a4a] flex flex-col items-center justify-center pt-8 p-6">
       <div className="w-full max-w-md">
-        <div className="bg-[#0f1f3a] rounded-t-lg p-4 border border-[#2a4a7a]">
-          <div className="flex items-center justify-between">
-            <label className="text-white text-sm font-semibold">
-              Language selection
-            </label>
-            <div className="flex items-center gap-3">
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value)}
-                className="bg-[#1a3a5a] text-white px-3 py-1 rounded text-sm border border-[#2a4a7a] cursor-pointer"
-              >
-                <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-              </select>
-              {/* Telegram Icon */}
-              <a
-                href="https://t.me/andes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center w-8 h-8 bg-blue-500 rounded-full hover:bg-blue-600 transition-colors"
-                title="Telegram"
-              >
-                <svg
-                  className="w-5 h-5 text-white"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M23.91 3.79L20.3 20.84c-.25 1.1-.98 1.37-1.98.85l-5.5-4.07-2.65 2.55c-.3.3-.55.56-1.12.56-.73 0-.6-.27-.84-.95L6.3 13.3 1.07 11.5c-.96-.3-1.36-.93-.14-1.43l21.26-8.2c.97-.43 1.9.24 1.57 1.91z" />
-                </svg>
-              </a>
-              {/* YouTube Icon */}
-              <a
-                href="https://youtube.com/andes"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center w-8 h-8 bg-red-600 rounded-full hover:bg-red-700 transition-colors"
-                title="YouTube"
-              >
-                <svg
-                  className="w-5 h-5 text-white"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-                </svg>
-              </a>
-            </div>
-          </div>
-        </div>
-
         <h1 className="text-white text-3xl font-bold text-center py-6 bg-[#0f1f3a] border-x border-[#2a4a7a]">
           Sign In
         </h1>
@@ -503,8 +465,8 @@ export default function SignInPage() {
                 password && passwordValid === true
                   ? "border-green-500"
                   : password
-                  ? "border-red-500"
-                  : "border-gray-500"
+                    ? "border-red-500"
+                    : "border-gray-500"
               }`}
             />
             {passwordValid === false && (
@@ -544,8 +506,6 @@ export default function SignInPage() {
           </div>
         </form>
       </div>
-
-      <SupportChat />
     </div>
   );
 }

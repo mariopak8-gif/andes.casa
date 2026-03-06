@@ -1,5 +1,6 @@
 'use client'
 
+import Footer from '@/components/Footer';
 import Link from 'next/link'
 
 export default function Page() {
@@ -169,49 +170,7 @@ export default function Page() {
             </section>
 
             {/* Footer */}
-            <footer className="bg-gray-900 text-white py-12 px-[5%]">
-                <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8">
-                    <div>
-                        <div className="flex items-center gap-3 mb-4">
-                            <img src="https://images.unsplash.com/photo-1589828876954-ec07463ac0e6?w=50&q=80" alt="ANDES Logo" className="w-10 h-10 object-contain" />
-                            <span className="font-playfair text-xl font-bold">ANDES</span>
-                        </div>
-                        <p className="text-gray-400 text-sm">Empowering a Global Sharing Economy for Tomorrow's Leaders</p>
-                    </div>
-
-                    <div>
-                        <h4 className="font-semibold text-lg mb-4">Quick Links</h4>
-                        <ul className="space-y-2 text-gray-400 text-sm">
-                            <li><Link href="/" className="hover:text-cyan-500 transition-colors">Home</Link></li>
-                            <li><Link href="/about" className="hover:text-cyan-500 transition-colors">About Us</Link></li>
-                            <li><Link href="/occupation" className="hover:text-cyan-500 transition-colors">Careers</Link></li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h4 className="font-semibold text-lg mb-4">Support</h4>
-                        <ul className="space-y-2 text-gray-400 text-sm">
-                            <li><a href="#faq" className="hover:text-cyan-500 transition-colors">FAQ</a></li>
-                            <li><a href="#contact" className="hover:text-cyan-500 transition-colors">Contact</a></li>
-                            <li><a href="#privacy" className="hover:text-cyan-500 transition-colors">Privacy Policy</a></li>
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h4 className="font-semibold text-lg mb-4">Connect</h4>
-                        <p className="text-gray-400 text-sm mb-4">Follow us on social media</p>
-                        <div className="flex gap-4">
-                            <a href="#" className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center hover:bg-cyan-600 transition-colors"><span className="text-white font-bold">f</span></a>
-                            <a href="#" className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center hover:bg-cyan-600 transition-colors"><span className="text-white font-bold">t</span></a>
-                            <a href="#" className="w-10 h-10 bg-cyan-500 rounded-full flex items-center justify-center hover:bg-cyan-600 transition-colors"><span className="text-white font-bold">in</span></a>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400 text-sm">
-                    <p>&copy; 2026 ANDES. All rights reserved.</p>
-                </div>
-            </footer>
+            <Footer/>
         </main>
         </div>
     );

@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useRouter } from 'next/navigation';
+import Footer from '@/components/Footer';
 
 const grades = [
   { grade: 'A1', equipment: 20, daily: 2, monthly: 60, annual: 730 },
@@ -252,23 +253,6 @@ export default function JoiningProcessPage() {
             </div>
           </div>
 
-          {/* ── Device Cards ── */}
-          <div className="mb-4">
-            <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-1">Start a Task</h3>
-            <p className="text-sm text-gray-500 mb-6">Select devices to begin earning daily income</p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-12">
-            {grades.slice(0, 6).map((item) => (
-              <DeviceCard
-                key={item.grade}
-                item={item}
-                userBalance={user?.depositAmount}
-                onRequestDeposit={(r) => setDepositModal({ open: true, required: r })}
-                isSignedIn={!!session?.user}
-              />
-            ))}
-          </div>
-
           {/* ── How it works cards ── */}
           <h3 className="text-xl sm:text-3xl font-bold text-gray-900 text-center mb-6">How It Works</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
@@ -322,7 +306,7 @@ export default function JoiningProcessPage() {
                       ['L1', '10', '$25', '$200', '—'],
                       ['L2', '30', '$80', '$500', '—'],
                       ['L3', '100', '$250', '$1,500', '$1,000'],
-                      ['L4', '500', '$1,250', '$4,000', 'Sedan 🚗'],
+                      ['L4', '500', '$1,250', '$4,000', 'Sedan'],
                     ].map((row, i) => (
                       <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                         {row.map((cell, j) => (
@@ -359,9 +343,9 @@ export default function JoiningProcessPage() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Min Deposit', value: '20 USDT' },
-                  { label: 'Min Withdrawal', value: '1 USDT' },
+                  { label: 'Min Withdrawal', value: '5 USDT' },
                   { label: 'Daily Update', value: '10:00 AM NY' },
-                  { label: 'Withdrawals', value: '1–3 mins' },
+                  { label: 'Withdrawals', value: '1–5 mins' },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
                     <div className="text-xs text-gray-400 uppercase tracking-wide">{label}</div>
@@ -394,49 +378,7 @@ export default function JoiningProcessPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="bg-gray-900 text-white py-10 px-4 sm:px-6">
-        <div className="max-w-5xl mx-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 mb-8">
-            <div className="col-span-2 sm:col-span-1">
-              <div className="flex items-center gap-2 mb-3">
-                <img src="https://images.unsplash.com/photo-1589828876954-ec07463ac0e6?w=50&q=80" alt="Logo" className="w-8 h-8 rounded-full" />
-                <span className="font-bold text-lg">ANDES</span>
-              </div>
-              <p className="text-gray-400 text-sm">Global Sharing Economy Platform</p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-3 text-sm">Quick Links</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                {[['/', 'Home'], ['/about', 'About'], ['/joining-process', 'Join']].map(([href, label]) => (
-                  <li key={href}><Link href={href} className="hover:text-teal-400 transition-colors">{label}</Link></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-3 text-sm">Support</h4>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                {['FAQ', 'Contact', 'Privacy'].map((l) => (
-                  <li key={l}><Link href="#" className="hover:text-teal-400 transition-colors">{l}</Link></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-3 text-sm">Connect</h4>
-              <div className="flex gap-2">
-                {['f', 't', 'in'].map((icon) => (
-                  <Link key={icon} href="#" className="w-8 h-8 bg-teal-600 hover:bg-teal-500 rounded-full flex items-center justify-center text-white text-xs font-bold transition-colors uppercase">
-                    {icon}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </div>
-          <div className="border-t border-gray-800 pt-6 text-center text-gray-500 text-xs">
-            © 2026 ANDES. All rights reserved.
-          </div>
-        </div>
-      </footer>
+   
 
       {/* ── Deposit Modal ── */}
       {depositModal.open && (
@@ -464,6 +406,8 @@ export default function JoiningProcessPage() {
           </div>
         </div>
       )}
+
+      <Footer/>
     </div>
   );
 }
