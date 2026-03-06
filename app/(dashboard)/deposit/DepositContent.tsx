@@ -250,21 +250,6 @@ export default function DepositContent() {
     );
   }
 
-  // Unauthenticated State
-  if (authState === AUTH_STATE.UNAUTHENTICATED) {
-     return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-           <div className="text-center space-y-4">
-              <h2 className="text-2xl font-bold text-gray-900">Sign in Required</h2>
-              <p className="text-gray-600">Please access your account to manage deposits.</p>
-              <Link href="/sign-in" className="inline-block px-6 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">
-                 Sign In
-              </Link>
-           </div>
-        </div>
-     );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-cyan-100 selection:text-cyan-900">
       {/* Background Effects (Light Mode) */}
