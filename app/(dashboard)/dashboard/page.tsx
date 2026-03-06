@@ -269,7 +269,7 @@ function DeviceCards({
         </Link>
       </div>
       {/* 2 cols on mobile, 3 on sm, 6 on lg — all 6 side by side on large screens */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-3 gap-3">
         {grades.map((item) => {
           const isActive = !!activeTasks[item.grade];
           const bg = GRADE_GRADIENTS[item.grade] || "from-gray-400 to-gray-500";
@@ -325,12 +325,7 @@ function RecentActivity({
     <div>
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-bold text-gray-900 text-sm">Recent Activity</h3>
-        <Link
-          href="/transactions"
-          className="text-teal-500 text-xs font-medium hover:underline"
-        >
-          See all →
-        </Link>
+        
       </div>
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50">
         {transactions.slice(0, 5).map((tx, i) => (
@@ -485,8 +480,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="bg-gray-50 min-h-screen pb-24">
-      {/* ── Activity ticker (full-width) ── */}
+    <main className="bg-gray-50 min-h-screen py-24">
 
       {/* ── Page body — constrained ── */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-5 pb-6 space-y-4">
