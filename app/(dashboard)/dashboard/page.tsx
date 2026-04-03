@@ -183,7 +183,7 @@ function QuickActions() {
         {actions.map(({ label, href, icon }) => (
           <Link
             key={label}
-            href={href}
+            href={href as any}
             className="flex flex-col items-center gap-2 group"
           >
             <div className="w-11 h-11 rounded-full bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-teal-50 group-hover:text-teal-600 group-hover:border-teal-100 transition-all active:scale-95">
@@ -578,10 +578,10 @@ export default function DashboardPage() {
                 onClick={() => {
                   if (depositModal.required)
                     router.push(
-                      "/deposit?" +
+                      ("/deposit?" +
                         new URLSearchParams({
                           amount: String(depositModal.required),
-                        }),
+                        })) as any,
                     );
                   setDepositModal({ open: false });
                 }}

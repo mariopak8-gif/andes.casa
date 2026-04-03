@@ -174,7 +174,7 @@ export default function JoiningProcessPage() {
 
   const goToDeposit = () => {
     if (!depositModal.required) return;
-    router.push('/deposit?' + new URLSearchParams({ amount: String(depositModal.required) }));
+    router.push(('/deposit?' + new URLSearchParams({ amount: String(depositModal.required) })) as any);
     setDepositModal({ open: false });
   };
 

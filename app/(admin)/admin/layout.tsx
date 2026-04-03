@@ -119,7 +119,7 @@ export default function AdminLayout({
             {menuItems.map((item) => (
               <li key={item.href}>
                 <Link
-                  href={item.href}
+                  href={item.href as any}
                   className="flex items-center gap-3 px-4 py-3 rounded-lg text-gray-300 hover:bg-red-600 hover:text-white transition font-medium text-sm"
                 >
                   <span className="text-lg flex-shrink-0">{item.icon}</span>

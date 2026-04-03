@@ -53,7 +53,7 @@ const NavigationContent = () => {
         {links.map((item, index) => (
           <li key={index} suppressHydrationWarning>
             <Link
-              href={item.href}
+              href={item.href as any}
               className="text-gray-800 font-medium text-sm relative hover:text-cyan-500 transition-colors duration-300 after:content-[''] after:absolute after:bottom-[-5px] after:left-0 after:w-0 after:h-0.5 after:bg-cyan-500 after:transition-all after:duration-300 hover:after:w-full"
             >
               <span>{item.name}</span>
@@ -109,12 +109,6 @@ const NavigationContent = () => {
                   </Link>
                 </>
               )}
-              <button
-                onClick={() => signOut({ redirect: true, callbackUrl: "/" })}
-                className="text-sm text-white font-medium bg-red-500 px-3 py-1 rounded hover:bg-red-600 transition-colors"
-              >
-                Sign Out
-              </button>
             </div>
           )}
         </li>
@@ -151,7 +145,7 @@ const NavigationContent = () => {
                 suppressHydrationWarning
               >
                 <Link
-                  href={item.href}
+                  href={item.href as any}
                   onClick={() => setIsOpen(false)}
                   className="block px-[5%] py-4 text-gray-800 font-medium hover:text-cyan-500 transition-colors"
                 >
