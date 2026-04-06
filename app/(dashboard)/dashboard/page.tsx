@@ -6,6 +6,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { api } from "@/convex/_generated/api";
+import LoadingState from "@/components/LoadingState";
 
 const MOCK_ACTIVITY = [
   "User ****1234 deposited 500 USDT",
@@ -448,12 +449,7 @@ export default function DashboardPage() {
 
   if (!isMounted || status === "loading" || user === undefined) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-teal-500 border-t-transparent animate-spin" />
-          <span className="text-sm text-gray-400">Loading…</span>
-        </div>
-      </div>
+      <LoadingState/>
     );
   }
 

@@ -1,21 +1,25 @@
 "use client";
 
 import Footer from "@/components/Footer";
-import { useSession } from "next-auth/react";
+import LoadingState from "@/components/LoadingState";
+import { useAuthState } from "@/lib/hooks/useAuthState";
 import Image from "next/image";
 import Link from "next/link";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 export default function Home() {
-  const { data: session, status } = useSession();
+  const { isLoading, isAuthenticated } = useAuthState();
   const router = useRouter();
+
   useEffect(() => {
-    if (session) {
+    if (isAuthenticated) {
       router.push("/dashboard");
     }
-  }, [session]);
-  if (status === "loading") return null;
+  }, [isAuthenticated, router]);
+
+  if (isLoading || isAuthenticated) return <LoadingState />;
+
   return (
     <div className="font-montserrat text-gray-800 overflow-x-hidden">
       {/* Hero Section */}

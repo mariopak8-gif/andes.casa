@@ -5,6 +5,8 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { AdminSecurityStatus } from '@/components/AdminSecurityStatus';
+import { useQuery } from 'convex/react';
+import { api } from '@/convex/_generated/api';
 
 export default function AdminLayout({
   children,
@@ -19,7 +21,9 @@ export default function AdminLayout({
   const [adminToken, setAdminToken] = useState<string | null>(null);
 
   const isAdmin = session?.user?.role === 'admin' || adminToken !== null;
-
+  const user = useQuery(api.user.getUserByContact, session?.user?.contact ? {
+    contact: session?.user?.contact ,
+  } : 'skip' );
   useEffect(() => {
     setIsMounted(true);
     const token = localStorage.getItem('admin_token');
@@ -39,11 +43,11 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (isMounted && !isAdmin && status !== 'loading') {
-      if (session && session.user?.role !== 'admin') {
+      if (session && user?.role !== 'admin') {
         router.push('/dashboard');
       }
     }
-  }, [isMounted, isAdmin, status, session, router]);
+  }, [isMounted, isAdmin, status, session, user, router]);
 
   const handleLogout = () => {
     // Clear admin token from localStorage
