@@ -6,6 +6,7 @@ import { signIn } from "next-auth/react";
 import { ALLOWED_COUNTRY_CODES } from "@/constants/countryCodes";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import PhoneInputWithCountry from "@/components/PhoneInputWithCountry";
+import { EyeIcon, EyeOffIcon } from "lucide-react";
 export default function SignInPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [countryCode, setCountryCode] = useState("+1");
@@ -21,7 +22,7 @@ export default function SignInPage() {
   const [locationMismatch, setLocationMismatch] = useState<boolean | null>(
     null,
   );
-
+  const [showTxPassword, setShowTxPassword] = useState(false);
   // Browser geolocation + reverse geocoding helpers
   const reverseGeocode = async (lat: number, lon: number) => {
     try {
@@ -199,7 +200,7 @@ export default function SignInPage() {
                 validatePassword(e.target.value);
               }}
               placeholder="Please enter password"
-              type="password"
+              type={showTxPassword ? "text" : "password"}
               className={`w-full px-4 py-3 rounded border-2 bg-[#152a4a] text-white placeholder-gray-500 text-sm focus:outline-none ${
                 password && passwordValid === true
                   ? "border-green-500"
@@ -208,6 +209,14 @@ export default function SignInPage() {
                     : "border-gray-500"
               }`}
             />
+            <button
+              type="button"
+              onClick={() => setShowTxPassword((v) => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors"
+              aria-label={showTxPassword ? "Hide password" : "Show password"}
+            >
+              {showTxPassword ? <EyeOffIcon /> : <EyeIcon />}
+            </button>
             {passwordValid === false && (
               <p className="text-red-400 text-xs mt-1">
                 Password must be at least 6 characters.
