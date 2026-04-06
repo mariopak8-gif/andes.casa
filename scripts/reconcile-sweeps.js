@@ -17,7 +17,7 @@ const { api } = require('../convex/_generated/api');
 const HOT = process.env.MAIN_WALLET_ADDRESS;
 const API_KEY = process.env.TRONGRID_API_KEY || '';
 const TRON_HOST = (process.env.FORCE_TESTNET === 'true') ? 'https://nile.trongrid.io' : (process.env.TRONGRID_API_URL || 'https://nile.trongrid.io');
-const ACTIVE_USDT_CONTRACT = process.env.USDT_CONTRACT_ADDRESS || 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
+const ACTIVE_USDT_CONTRACT = process.env.USDT_CONTRACT_ADDRESS ;
 const CONVEX_URL = process.env.NEXT_PUBLIC_CONVEX_URL;
 
 if (!HOT) {

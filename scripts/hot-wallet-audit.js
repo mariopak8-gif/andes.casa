@@ -9,7 +9,7 @@ try { require('dotenv').config({ path: process.env.DOTENV_PATH || '.env.local' }
 const HOT = process.env.MAIN_WALLET_ADDRESS || process.env.HOT_WALLET_ADDRESS;
 const API_KEY = process.env.TRONGRID_API_KEY || '';
 const TRON_HOST = (process.env.FORCE_TESTNET === 'true') ? 'https://nile.trongrid.io' : (process.env.TRONGRID_API_URL || 'https://nile.trongrid.io');
-const ACTIVE_USDT_CONTRACT = process.env.USDT_CONTRACT_ADDRESS || 'TXYZopYRdj2D9XRtbG411XZZ3kM5VkAeBf';
+const ACTIVE_USDT_CONTRACT = process.env.USDT_CONTRACT_ADDRESS ;
 
 if (!HOT) {
   console.error('HOT wallet address not set. Set MAIN_WALLET_ADDRESS env var.');

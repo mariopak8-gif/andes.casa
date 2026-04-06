@@ -56,8 +56,8 @@ export default function PhoneInputWithCountry({
 
   const filteredCountries = (() => {
     const trimmed = search.trim();
-    // Only filter when user has typed at least 2 characters
-    if (trimmed.length < 2) {
+    // Only filter when user has typed at least 3 characters
+    if (trimmed.length < 3) {
       return COUNTRIES.filter(
         (country, index, self) =>
           self.findIndex((item) => item.value === country.value) === index
@@ -121,7 +121,7 @@ export default function PhoneInputWithCountry({
                     ref={inputRef}
                     type="text"
                     value={search}
-                    placeholder="Search country… (min 2 chars)"
+                    placeholder="Search country… (min 3 chars)"
                     onChange={(e) => setSearch(e.target.value)}
                     // Prevent Radix Select from intercepting keystrokes
                     onKeyDown={(e) => e.stopPropagation()}
