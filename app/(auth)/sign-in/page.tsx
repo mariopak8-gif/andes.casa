@@ -91,7 +91,7 @@ export default function SignInPage() {
           setLocationCountry(json?.country || null);
         }
       } catch (err) {
-        // ignore
+        // ignoreJdelivery
       }
 
       // If still no country, try browser geolocation as a last resort

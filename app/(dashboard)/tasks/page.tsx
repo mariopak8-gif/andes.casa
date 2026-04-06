@@ -388,9 +388,11 @@ function TaskCard({
 
   const required  = item.equipment;
   const canAfford = userBalance >= required;
+  const equipments = [20, 100, 380, 780, 1800, 4800, 12800, 25800, 58000, 128000, 280000];
+  const hasHigherAffordable = equipments.slice(equipments.indexOf(required) + 1).some(eq => eq <= userBalance);
   const onCooldown = !!cooldownEndTime;
-  // Tasks are ALWAYS open — only gate is balance + cooldown
-  const canClaim = canAfford && !onCooldown && !isLoading;
+  // Tasks are ALWAYS open — only gate is balance + cooldown + higher available
+  const canClaim = canAfford && !onCooldown && !isLoading && !hasHigherAffordable;
 
   // Load cooldown from localStorage on mount
   useEffect(() => {
@@ -506,6 +508,10 @@ function TaskCard({
             <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
               ⏳ Reward claimed — renews {renewalLabel}
             </span>
+          ) : hasHigherAffordable ? (
+            <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-500">
+              🔒 Upgrade available
+            </span>
           ) : canAfford ? (
             <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700">
               ✅ Ready to claim
@@ -569,6 +575,8 @@ function TaskCard({
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
               : onCooldown
               ? 'bg-orange-100 text-orange-700 cursor-not-allowed'
+              : hasHigherAffordable
+              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
               : canClaim
               ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -578,6 +586,8 @@ function TaskCard({
             ? '⏳ Claiming...'
             : onCooldown
             ? `⏳ ${cooldownRemaining || '00:00:00'}`
+            : hasHigherAffordable
+            ? 'Upgrade to higher package'
             : !canAfford
             ? `Need $${(required - userBalance).toLocaleString()} more`
             : '🎯 Claim Daily Reward'}
