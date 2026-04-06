@@ -30,6 +30,9 @@ export default function DepositContent() {
   const [qrSrc, setQrSrc] = useState("");
   const router = useRouter();
 
+  // Local state for address to handle immediate display after generation
+  const [localAddress, setLocalAddress] = useState("");
+
   // Convex queries
   const user = useQuery(
     api.user.getUserByContact,
@@ -47,7 +50,7 @@ export default function DepositContent() {
   });
 
   // Get current address for TRC20 network
-  const currentAddress = depositAddresses?.trc20 || "";
+  const currentAddress = depositAddresses?.trc20 || localAddress || "";
 
   // ROBUST AUTH STATE LOGIC
   const authState = useMemo(() => {
@@ -78,7 +81,7 @@ export default function DepositContent() {
       id: "trc20",
       network: "Tron (TRC20)",
       token: "USDT / TRX",
-      minDeposit: 10,
+      minDeposit: 20,
     }),
     []
   );
@@ -96,23 +99,12 @@ export default function DepositContent() {
     return `${start}...${end}`;
   }, [currentAddress]);
 
-  // Generate address when network changes and no address exists
+  // Sync local address with query result
   useEffect(() => {
-    const userId = user && typeof user._id !== "undefined" ? user._id : null;
-
-    if (
-      authState === AUTH_STATE.AUTHENTICATED &&
-      userId &&
-      !currentAddress &&
-      !generating
-    ) {
-      // Auto-generate address for the selected network
-      generateAddress("trc20");
+    if (depositAddresses?.trc20) {
+      setLocalAddress(depositAddresses.trc20);
     }
-    // Keep dependency array length stable by always providing the same
-    // set of entries (use null for absent userId)
-  }, [authState, user && user._id ? user._id : null, currentAddress, generating, generateAddress]);
-
+  }, [depositAddresses?.trc20]);
   // Initial balance check on mount or address change
   useEffect(() => {
     let mounted = true;

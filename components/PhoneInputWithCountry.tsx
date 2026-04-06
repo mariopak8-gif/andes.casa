@@ -30,7 +30,7 @@ export default function PhoneInputWithCountry({
   setPhoneNumber,
   validatePhone,
   phoneValid,
-  phonePlaceholder = "Please enter mobile phone number",
+  phonePlaceholder = "Phone number",
 }: PhoneInputWithCountryProps) {
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
@@ -47,7 +47,7 @@ export default function PhoneInputWithCountry({
     if (open) {
       const timeout = setTimeout(() => {
         inputRef.current?.focus();
-      }, 50);
+      }, 80);
       return () => clearTimeout(timeout);
     } else {
       setSearch("");
@@ -56,11 +56,10 @@ export default function PhoneInputWithCountry({
 
   const filteredCountries = (() => {
     const trimmed = search.trim();
-    // Only filter when user has typed at least 3 characters
     if (trimmed.length < 3) {
       return COUNTRIES.filter(
         (country, index, self) =>
-          self.findIndex((item) => item.value === country.value) === index
+          self.findIndex((item) => item.value === country.value) === index,
       );
     }
     const lower = trimmed.toLowerCase();
@@ -68,15 +67,16 @@ export default function PhoneInputWithCountry({
       (country, index, self) =>
         self.findIndex((item) => item.value === country.value) === index &&
         (country.country.toLowerCase().includes(lower) ||
-          country.value.includes(trimmed))
+          country.value.includes(trimmed)),
     );
   })();
 
   return (
-    <div className="relative">
-      <div className="flex items-center gap-2">
-        {/* Country Select */}
-        <div className="flex-1">
+    <div className="w-full">
+      {/* Stack vertically on mobile, side-by-side on sm+ */}
+      <div className="flex flex-col sm:flex-row items-stretch gap-2">
+        {/* ── Country selector ── */}
+        <div className="w-full sm:w-auto sm:flex-1">
           <Select
             value={countryCode}
             onValueChange={(value) => {
@@ -87,11 +87,16 @@ export default function PhoneInputWithCountry({
             onOpenChange={setOpen}
           >
             <SelectTrigger
-              className={`w-full rounded-lg border-2 bg-[#152a4a] text-white text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-[#0d1f3c] ${
-                countryCode && countryCode !== ""
-                  ? "border-green-500 focus:ring-green-500/40"
-                  : "border-red-500 focus:ring-red-500/40"
-              }`}
+              className={`
+                w-full h-12 sm:h-11 rounded-lg border-2 bg-[#152a4a] text-white text-sm
+                transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1
+                focus:ring-offset-[#0d1f3c] touch-manipulation
+                ${
+                  countryCode && countryCode !== ""
+                    ? "border-green-500 focus:ring-green-500/40"
+                    : "border-red-500 focus:ring-red-500/40"
+                }
+              `}
             >
               <SelectValue placeholder="Select Country" />
             </SelectTrigger>
@@ -99,13 +104,22 @@ export default function PhoneInputWithCountry({
             <SelectContent
               position="popper"
               align="start"
-              className="min-w-[var(--radix-select-trigger-width)] max-w-full bg-[#1a2a4a] text-white border border-[#2a3f6a] shadow-2xl rounded-xl overflow-hidden p-0"
+              // On mobile: full viewport width via fixed positioning trick
+              className="
+                z-50
+                w-[calc(100vw-2rem)] sm:w-auto
+                sm:min-w-[var(--radix-select-trigger-width)]
+                max-w-full
+                bg-[#1a2a4a] text-white
+                border border-[#2a3f6a]
+                shadow-2xl rounded-xl overflow-hidden p-0
+              "
             >
-              {/* Search box */}
-              <div className="sticky top-0 z-10 bg-[#1a2a4a] border-b border-[#2a3f6a] px-3 py-2.5">
+              {/* ── Search box ── */}
+              <div className="sticky top-0 z-10 bg-[#1a2a4a] border-b border-[#2a3f6a] px-3 py-3">
                 <div className="relative">
                   <svg
-                    className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none"
+                    className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -123,35 +137,70 @@ export default function PhoneInputWithCountry({
                     value={search}
                     placeholder="Search country… (min 3 chars)"
                     onChange={(e) => setSearch(e.target.value)}
-                    // Prevent Radix Select from intercepting keystrokes
                     onKeyDown={(e) => e.stopPropagation()}
                     onKeyUp={(e) => e.stopPropagation()}
                     onKeyPress={(e) => e.stopPropagation()}
-                    className="w-full pl-8 pr-3 py-1.5 rounded-md bg-[#0d1f3c] text-white text-sm placeholder:text-slate-500 border border-[#2a3f6a] focus:border-blue-500 focus:outline-none transition-colors"
+                    
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    style={{ fontSize: "16px" }}
+                    // Prevent iOS zoom on focus (font-size >= 16px)
+                    className="
+                      w-full pl-9 pr-9 py-2.5 rounded-lg
+                      bg-[#0d1f3c] text-white text-sm
+                      placeholder:text-slate-500
+                      border border-[#2a3f6a]
+                      focus:border-blue-500 focus:outline-none
+                      transition-colors touch-manipulation
+                    "
                   />
                   {search.length > 0 && (
                     <button
-                      onClick={() => {
+                      type="button"
+                      onPointerDown={(e) => {
+                        // Use pointerDown so it fires before blur steals focus back
+                        e.preventDefault();
                         setSearch("");
                         inputRef.current?.focus();
                       }}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                      className="
+                        absolute right-2.5 top-1/2 -translate-y-1/2
+                        w-6 h-6 flex items-center justify-center
+                        text-slate-400 hover:text-white active:text-white
+                        transition-colors rounded-full
+                        hover:bg-white/10 active:bg-white/10
+                      "
+                      aria-label="Clear search"
                     >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-3.5 h-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   )}
                 </div>
-                {search.length === 1 && (
-                  <p className="text-xs text-amber-400/80 mt-1.5 pl-1">
-                    Type one more character to search…
+
+                {/* Hint: only show when 1 or 2 chars typed */}
+                {search.trim().length > 0 && search.trim().length < 3 && (
+                  <p className="text-xs text-amber-400/80 mt-2 pl-1">
+                    Type {3 - search.trim().length} more character
+                    {3 - search.trim().length !== 1 ? "s" : ""} to search…
                   </p>
                 )}
               </div>
 
-              {/* List */}
-              <div className="max-h-56 overflow-y-auto overscroll-contain">
+              {/* ── Country list ── */}
+              <div className="max-h-[45vh] sm:max-h-56 overflow-y-auto overscroll-contain">
                 <SelectGroup>
                   <SelectLabel className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
                     Country
@@ -161,27 +210,41 @@ export default function PhoneInputWithCountry({
                       <SelectItem
                         key={`${country.value}-${country.country}-${index}`}
                         value={country.value}
+                        // Tall touch target on mobile
                         className="
-                          px-3 py-2 text-sm cursor-pointer
+                          px-3 py-3 sm:py-2 text-sm cursor-pointer
+                          min-h-[44px] sm:min-h-0
                           text-slate-200
                           hover:bg-[#2a3f6a] hover:text-white
                           focus:bg-[#2a3f6a] focus:text-white
+                          active:bg-[#2a3f6a]
                           data-[state=checked]:bg-blue-600/30
                           data-[state=checked]:text-blue-200
                           data-[state=checked]:font-medium
                           transition-colors duration-100
-                          outline-none
+                          outline-none touch-manipulation
                         "
                       >
                         {country.label}
                       </SelectItem>
                     ))
                   ) : (
-                    <div className="px-3 py-6 text-sm text-slate-400 text-center">
-                      <svg className="w-8 h-8 mx-auto mb-2 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <div className="px-3 py-8 text-sm text-slate-400 text-center">
+                      <svg
+                        className="w-8 h-8 mx-auto mb-2 text-slate-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={1.5}
+                          d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
                       </svg>
-                      No countries found for "<span className="text-white">{search}</span>"
+                      No results for{" "}
+                      <span className="text-white font-medium">"{search}"</span>
                     </div>
                   )}
                 </SelectGroup>
@@ -190,7 +253,7 @@ export default function PhoneInputWithCountry({
           </Select>
         </div>
 
-        {/* Phone number input */}
+        {/* ── Phone number input ── */}
         <Input
           value={phoneNumber}
           onChange={(e) => {
@@ -199,11 +262,24 @@ export default function PhoneInputWithCountry({
           }}
           placeholder={phonePlaceholder}
           type="tel"
-          className={`flex-1 px-4 py-3 rounded-lg border-2 bg-[#152a4a] text-white placeholder:text-slate-500 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-[#0d1f3c] ${
-            phoneNumber && phoneValid === true
-              ? "border-green-500 focus:ring-green-500/40"
-              : "border-red-500 focus:ring-red-500/40"
-          }`}
+          inputMode="tel"
+          autoComplete="tel"
+          // Prevent iOS zoom (font-size >= 16px handled via style)
+          style={{ fontSize: "16px" }}
+          className={`
+            w-full sm:flex-1 h-12 sm:h-11
+            px-4 rounded-lg border-2
+            bg-[#152a4a] text-white placeholder:text-slate-500
+            text-sm transition-colors
+            focus:outline-none focus:ring-2 focus:ring-offset-1
+            focus:ring-offset-[#0d1f3c]
+            touch-manipulation
+            ${
+              phoneNumber && phoneValid === true
+                ? "border-green-500 focus:ring-green-500/40"
+                : "border-red-500 focus:ring-red-500/40"
+            }
+          `}
         />
       </div>
     </div>

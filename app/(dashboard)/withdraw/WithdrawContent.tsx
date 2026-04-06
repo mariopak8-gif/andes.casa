@@ -8,7 +8,7 @@ import toast from "@/lib/clientToast";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 
-const MIN_WITHDRAWAL = { trc20: 5 };
+const MIN_WITHDRAWAL = { trc20: 4 }; // Minimum withdrawal amounts per network
 
 function formatTimeRemaining(ms: number | null): string {
   if (!ms || ms <= 0) return "Ready";
