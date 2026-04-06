@@ -161,27 +161,14 @@ export default function BottomNav() {
         </div>
 
         {/* Right items */}
-        {navItems.slice(2).map(({ href, label, Icon, isSignOut }) => {
-          const active = pathname === href && !isSignOut
+        {navItems.slice(2).map(({ href, label, Icon }) => {
+          const active = pathname === href 
           return (
             <div
               key={href}
               className="flex-1 flex flex-col items-center pt-2 pb-3 gap-1 group"
             >
-              {isSignOut ? (
-                <button
-                  onClick={() => signOut({ redirect: true, callbackUrl: "/" })}
-                  className="flex flex-col items-center gap-1"
-                >
-                  <span className="transition-transform duration-200 group-hover:scale-105">
-                    <Icon active={false} />
-                  </span>
-                  <span className="text-[10px] font-medium tracking-wide transition-colors duration-200 text-red-500">
-                    {label}
-                  </span>
-                </button>
-              ) : (
-                <Link
+               <Link
                   href={href as any}
                   className="flex flex-col items-center gap-1"
                 >
@@ -194,7 +181,6 @@ export default function BottomNav() {
                     {label}
                   </span>
                 </Link>
-              )}
             </div>
           )
         })}
