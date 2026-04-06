@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import React from 'react'
+import { signOut } from 'next-auth/react'
 
 const HomeIcon = ({ active }: { active: boolean }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -71,6 +72,32 @@ const ProfileIcon = ({ active }: { active: boolean }) => (
   </svg>
 )
 
+const SignOutIcon = ({ active }: { active: boolean }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path
+      d="M9 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H9"
+      stroke={active ? '#dc2626' : '#9ca3af'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M16 17L21 12L16 7"
+      stroke={active ? '#dc2626' : '#9ca3af'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <path
+      d="M21 12H9"
+      stroke={active ? '#dc2626' : '#9ca3af'}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 const navItems = [
   { href: '/dashboard',         label: 'Home',    Icon: HomeIcon },
   { href: '/tasks',     label: 'Task',    Icon: TaskIcon },
@@ -95,7 +122,7 @@ export default function BottomNav() {
           return (
             <Link
               key={href}
-              href={href}
+              href={href as any}
               className="flex-1 flex flex-col items-center pt-2 pb-3 gap-1 group"
             >
               <span className={`transition-transform duration-200 ${active ? 'scale-110' : 'group-hover:scale-105'}`}>
@@ -133,24 +160,42 @@ export default function BottomNav() {
           </Link>
         </div>
 
-        {/* Right two items */}
-        {navItems.slice(2, 4).map(({ href, label, Icon }) => {
-          const active = pathname === href
+        {/* Right items */}
+        {navItems.slice(2).map(({ href, label, Icon, isSignOut }) => {
+          const active = pathname === href && !isSignOut
           return (
-            <Link
+            <div
               key={href}
-              href={href}
               className="flex-1 flex flex-col items-center pt-2 pb-3 gap-1 group"
             >
-              <span className={`transition-transform duration-200 ${active ? 'scale-110' : 'group-hover:scale-105'}`}>
-                <Icon active={active} />
-              </span>
-              <span className={`text-[10px] font-medium tracking-wide transition-colors duration-200 ${
-                active ? 'text-teal-600' : 'text-gray-400'
-              }`}>
-                {label}
-              </span>
-            </Link>
+              {isSignOut ? (
+                <button
+                  onClick={() => signOut({ redirect: true, callbackUrl: "/" })}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <span className="transition-transform duration-200 group-hover:scale-105">
+                    <Icon active={false} />
+                  </span>
+                  <span className="text-[10px] font-medium tracking-wide transition-colors duration-200 text-red-500">
+                    {label}
+                  </span>
+                </button>
+              ) : (
+                <Link
+                  href={href as any}
+                  className="flex flex-col items-center gap-1"
+                >
+                  <span className={`transition-transform duration-200 ${active ? 'scale-110' : 'group-hover:scale-105'}`}>
+                    <Icon active={active} />
+                  </span>
+                  <span className={`text-[10px] font-medium tracking-wide transition-colors duration-200 ${
+                    active ? 'text-teal-600' : 'text-gray-400'
+                  }`}>
+                    {label}
+                  </span>
+                </Link>
+              )}
+            </div>
           )
         })}
       </div>

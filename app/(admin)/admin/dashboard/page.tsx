@@ -110,7 +110,7 @@ export default function AdminDashboard() {
             {quickActions.map((action, idx) => (
               <Link
                 key={idx}
-                href={action.href}
+                href={action.href as any}
                 className="bg-white rounded-xl p-6 shadow-md hover:shadow-lg hover:scale-105 transition border-t-4 border-red-500 group"
               >
                 <div className="text-3xl mb-3 group-hover:scale-125 transition">{action.icon}</div>

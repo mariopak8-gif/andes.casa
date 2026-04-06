@@ -283,16 +283,86 @@ export const completeTaskWithRewards = mutation({
     const task = await ctx.db.get(args.taskId);
     if (!task) return { success: false, error: "Task not found" };
 
+    const user = await ctx.db.get(args.userId);
+    if (!user) return { success: false, error: "User not found" };
+
+    // Check 24-hour cooldown after last task claim
+    const now = Date.now();
+    const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    if (user.lastTaskClaimTime && (now - user.lastTaskClaimTime) < cooldownMs) {
+      const remainingMs = cooldownMs - (now - user.lastTaskClaimTime);
+      const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
+      return { success: false, error: `You must wait ${remainingHours} hours before claiming another task reward.` };
+    }
+
     // Delegate to helper which locks-in awarding and marks task completed
     const awardResult = await awardTaskRewards(ctx, task);
     if (!awardResult || !awardResult.success) {
       return { success: false, error: "Failed to award rewards" };
     }
 
+    // Update last task claim time
+    await ctx.db.patch(args.userId, {
+      lastTaskClaimTime: now,
+    });
+
     return {
       success: true,
       taskId: args.taskId,
       grade: task.grade,
+      earningsAwarded: awardResult.earningsAwarded,
+      newBalance: awardResult.newBalance,
+      newEarnings: awardResult.newEarnings,
+    };
+  },
+});
+
+// Instant claim task (creates and immediately completes a task)
+export const instantClaimTask = mutation({
+  args: {
+    userId: v.id("user"),
+    grade: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) return { success: false, error: "User not found" };
+
+    // Check 24-hour cooldown after last task claim
+    const now = Date.now();
+    const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+    if (user.lastTaskClaimTime && (now - user.lastTaskClaimTime) < cooldownMs) {
+      const remainingMs = cooldownMs - (now - user.lastTaskClaimTime);
+      const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
+      return { success: false, error: `You must wait ${remainingHours} hours before claiming another task reward.` };
+    }
+
+    // Create a task record (with 0 duration since it's instant)
+    const taskId = await ctx.db.insert("task", {
+      userId: args.userId,
+      grade: args.grade,
+      startedAt: now,
+      expiresAt: now, // Instant expiry
+      status: "active",
+      durationHours: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Immediately award rewards
+    const awardResult = await awardTaskRewards(ctx, { _id: taskId, ...await ctx.db.get(taskId) } as any);
+    if (!awardResult || !awardResult.success) {
+      return { success: false, error: "Failed to award rewards" };
+    }
+
+    // Update last task claim time
+    await ctx.db.patch(args.userId, {
+      lastTaskClaimTime: now,
+    });
+
+    return {
+      success: true,
+      taskId,
+      grade: args.grade,
       earningsAwarded: awardResult.earningsAwarded,
       newBalance: awardResult.newBalance,
       newEarnings: awardResult.newEarnings,

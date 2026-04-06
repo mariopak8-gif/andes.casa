@@ -44,6 +44,7 @@ export default defineSchema({
     passwordForgottenAt: v.optional(v.number()),
     transactionPasswordChangedAt: v.optional(v.number()),
     transferredOut: v.optional(v.number()),
+    lastTaskClaimTime: v.optional(v.number()),
   })
     .index("by_contact", ["contact"])
     .index("by_email", ["email"])
