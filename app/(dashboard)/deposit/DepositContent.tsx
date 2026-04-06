@@ -101,10 +101,16 @@ export default function DepositContent() {
 
   // Sync local address with query result
   useEffect(() => {
-    if (depositAddresses?.trc20) {
-      setLocalAddress(depositAddresses.trc20);
-    }
-  }, [depositAddresses?.trc20]);
+  if (
+    authState === AUTH_STATE.AUTHENTICATED &&
+    user?._id &&
+    depositAddresses !== undefined && // query has finished loading (not undefined)
+    !depositAddresses?.trc20 &&        // no address exists yet
+    !generating                        // not already in progress
+  ) {
+    generateAddress("trc20");
+  }
+}, [authState, user?._id, depositAddresses, generating, generateAddress]);
   // Initial balance check on mount or address change
   useEffect(() => {
     let mounted = true;
