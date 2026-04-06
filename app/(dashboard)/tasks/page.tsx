@@ -379,7 +379,7 @@ function TaskCard({
   renewalTimeZone?: string;
   isActive?: boolean;
 }) {
-  const [showDepositError, setShowDepositError] = useState(false);
+  const router = useRouter();
   const [cooldownEndTime, setCooldownEndTime] = useState<number | null>(null);
   const [cooldownRemaining, setCooldownRemaining] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -457,8 +457,7 @@ function TaskCard({
   // ── Claim handler ──────────────────────────────────────────────────────────
   const handleClaim = async () => {
     if (!canAfford) {
-      setShowDepositError(true);
-      setTimeout(() => setShowDepositError(false), 3000);
+      router.push('/deposit');
       return;
     }
     if (!userId) return;
@@ -557,19 +556,10 @@ function TaskCard({
           </div>
         )}
 
-        {/* Insufficient balance error */}
-        {showDepositError && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-red-700 font-semibold">
-              ❌ Need ${(required - userBalance).toLocaleString()} more USDT to unlock this package
-            </p>
-          </div>
-        )}
-
         {/* CTA button */}
         <button
           onClick={handleClaim}
-          disabled={!canClaim}
+          // disabled={onCooldown || hasHigherAffordable || isLoading}
           className={`w-full py-3 rounded-lg font-semibold text-sm transition-all font-mono tracking-wide ${
             isLoading
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -577,6 +567,8 @@ function TaskCard({
               ? 'bg-orange-100 text-orange-700 cursor-not-allowed'
               : hasHigherAffordable
               ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              : !canAfford
+              ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95'
               : canClaim
               ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:shadow-lg hover:shadow-emerald-500/30 active:scale-95'
               : 'bg-gray-100 text-gray-400 cursor-not-allowed'
@@ -589,7 +581,7 @@ function TaskCard({
             : hasHigherAffordable
             ? 'Upgrade to higher package'
             : !canAfford
-            ? `Need $${(required - userBalance).toLocaleString()} more`
+            ? `💳 Deposit $${(required - userBalance).toLocaleString()} to unlock`
             : '🎯 Claim Daily Reward'}
         </button>
 
