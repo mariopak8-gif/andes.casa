@@ -15,7 +15,6 @@ const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 const MIN_USDT_TO_SWEEP = 1;
 const FALLBACK_TRX_PRICE = 0.15;
 
-// fetch TRX price in USD
 async function getTrxPriceInUsdt(): Promise<number> {
   try {
     const res = await axios.get(
@@ -28,7 +27,7 @@ async function getTrxPriceInUsdt(): Promise<number> {
 }
 
 /**
- * Fund gas if needed, then sweep all USDT to hot wallet using energy-first approach
+ * Activate new address if needed, then sweep USDT using rented energy only (no TRX gas funding)
  */
 async function energyFirstSweep(
   depositAddress: string,
@@ -48,16 +47,16 @@ async function energyFirstSweep(
     try {
       const txId = await sendTrx(depositAddress, 1);
       console.log(`✅ [ACTIVATE] Address activated: ${txId}`);
-      await new Promise(r => setTimeout(r, 5000)); // wait for confirmation
+      await new Promise(r => setTimeout(r, 5000));
     } catch (err: any) {
       console.error("❌ [ACTIVATE ERROR]:", err);
       return null;
     }
   } else {
-    console.log(`⚡ [ENERGY] Using rented energy — skipping TRX funding`);
+    console.log(`⚡ [ENERGY] Address active — using rented energy, no TRX funding`);
   }
 
-  // STEP 2: Sweep USDT using energy
+  // STEP 2: Sweep USDT using rented energy only (no TRX gas funding)
   try {
     console.log(`🔁 [SWEEP] Sweeping ${usdtBalance} USDT → ${hotWalletAddress}`);
     const sweepRes = await sweepUsdtFromAddress(
@@ -71,7 +70,7 @@ async function energyFirstSweep(
     console.log(`✅ [SWEEP] Swept ${sweepRes.amount} USDT → ${hotWalletAddress}`);
     return sweepRes;
   } catch (err: any) {
-    console.error("❌ [SWEEP ERROR]:", err);
+    console.error("❌ [SWEEP ERROR]:", err?.message ?? err);
     return null;
   }
 }
@@ -177,7 +176,9 @@ export async function GET(req: Request) {
       const txAmountUsdt =
         tx?.type === "TRX" ? Number(tx?.amount) * trxPrice : Number(tx?.amount);
 
-      console.log(`\n🆕 Deposit: ${tx?.amount} ${tx?.type} = $${txAmountUsdt.toFixed(4)} | ${tx?.txHash}`);
+      console.log(
+        `\n🆕 Deposit: ${tx?.amount} ${tx?.type} = $${txAmountUsdt.toFixed(4)} | ${tx?.txHash}`
+      );
 
       let recordedTxHash = tx?.txHash;
       let recordedAmount = txAmountUsdt;
@@ -222,9 +223,12 @@ export async function GET(req: Request) {
       }
     }
 
-    // Fallback sweep — USDT on-chain but no new txs
+    // Fallback sweep — USDT on-chain but no new txs detected
     if (deposits.length === 0 && balance.usdt >= MIN_USDT_TO_SWEEP && canSweep) {
-      console.log(`\n🔍 [FALLBACK] ${balance.usdt} USDT sitting on address — attempting sweep`);
+      console.log(
+        `\n🔍 [FALLBACK] ${balance.usdt} USDT sitting on address — attempting sweep`
+      );
+
       const sweepResult = await energyFirstSweep(
         depositAddress,
         hotWalletAddress!,
@@ -261,7 +265,9 @@ export async function GET(req: Request) {
         userId: user._id,
         depositAmount: newTotal,
       });
-      console.log(`\n💳 Credited $${totalNewDepositAmount.toFixed(4)} — new total: $${newTotal.toFixed(4)}`);
+      console.log(
+        `\n💳 Credited $${totalNewDepositAmount.toFixed(4)} — new total: $${newTotal.toFixed(4)}`
+      );
     } else {
       console.log(`\nℹ️ No new deposits`);
     }
@@ -284,7 +290,8 @@ export async function GET(req: Request) {
     return NextResponse.json(
       {
         error: "Failed to check deposits",
-        details: process.env.NODE_ENV === "development" ? error?.message : undefined,
+        details:
+          process.env.NODE_ENV === "development" ? error?.message : undefined,
       },
       { status: 500 }
     );
