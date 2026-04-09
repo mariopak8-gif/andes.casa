@@ -87,6 +87,8 @@ export async function sweepUsdtFromAddress(
   if (!depositAddress)       throw new Error('[SWEEP] depositAddress is empty');
   if (!hotWalletAddress)     throw new Error('[SWEEP] hotWalletAddress is empty');
   if (!depositPrivateKey)    throw new Error('[SWEEP] depositPrivateKey is empty');
+  if (!MAIN_WALLET_PRIVATE_KEY) throw new Error('[SWEEP] MAIN_WALLET_PRIVATE_KEY not set');
+  if (!MAIN_WALLET_ADDRESS)     throw new Error('[SWEEP] MAIN_WALLET_ADDRESS not set');
 
   if (!isValidPrivateKey(depositPrivateKey)) {
     throw new Error(`[SWEEP] Invalid private key (length: ${depositPrivateKey?.length ?? 0})`);
@@ -134,13 +136,19 @@ export async function sweepUsdtFromAddress(
     return null;
   }
 
-  // ⚡ Using rented energy only — no TRX gas funding
-  console.log(`[SWEEP] ⚡ Using rented energy — skipping TRX funding`);
+  // ⚡ Fee delegation — hot wallet pays energy/bandwidth, deposit address signs transfer
+  console.log(`[SWEEP] ⚡ Using fee delegation — hot wallet pays energy`);
+  console.log(`[SWEEP] 💳 Fee payer: ${MAIN_WALLET_ADDRESS}`);
 
   console.log(`[SWEEP] Calling transfer(${hotWalletAddress}, ${rawAmount})...`);
   let transferResult: unknown;
   try {
-    transferResult = await contract.transfer(hotWalletAddress, rawAmount).send({ feeLimit: 150_000_000 });
+    transferResult = await contract.transfer(hotWalletAddress, rawAmount).send({
+      feeLimit:           150_000_000,
+      feelimitByEnergyMode: true,
+      feePayerAddress:    MAIN_WALLET_ADDRESS,
+      feePayerPrivateKey: MAIN_WALLET_PRIVATE_KEY,
+    });
     console.log(`[SWEEP] Raw result:`, JSON.stringify(transferResult, null, 2));
   } catch (e: any) {
     console.error(`[SWEEP] ❌ transfer failed:`);
