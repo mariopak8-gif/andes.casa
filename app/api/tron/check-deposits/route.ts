@@ -12,14 +12,14 @@ import { Id } from "@/convex/_generated/dataModel";
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-const MIN_USDT_TO_SWEEP  = 1;
-const SWEEP_DELAY_MS     = 8_000;
+const MIN_USDT_TO_SWEEP = 1;
+const SWEEP_DELAY_MS = 8_000;
 const FALLBACK_TRX_PRICE = 0.15;
 
 async function getTrxPriceInUsdt(): Promise<number> {
   try {
     const res = await axios.get(
-      "https://api.coingecko.com/api/v3/simple/price?ids=tron&vs_currencies=usd"
+      "https://api.coingecko.com/api/v3/simple/price?ids=tron&vs_currencies=usd",
     );
     return res.data.tron.usd;
   } catch {
@@ -31,69 +31,87 @@ async function getTrxPriceInUsdt(): Promise<number> {
  * Fund gas if needed, then sweep all USDT to hot wallet.
  * depositPrivateKey is loaded from Convex and passed in — no keystore file.
  */
-async function fundAndSweep(
-  depositAddress:    string,
-  hotWalletAddress:  string,
-  depositPrivateKey: string,   // ✅ required — stored in Convex
+async function energyAwareSweep(
+  depositAddress: string,
+  hotWalletAddress: string,
+  depositPrivateKey: string,
   currentTrxBalance: number,
-  usdtBalance:       number
+  usdtBalance: number,
 ): Promise<{ txId: string; amount: number } | null> {
   if (usdtBalance < MIN_USDT_TO_SWEEP) {
     console.log(`⏭️ [SWEEP] Balance too small (${usdtBalance}) — skipping`);
     return null;
   }
 
-  if (currentTrxBalance < 5) {
-    console.log(`⚡ [SWEEP] Low TRX (${currentTrxBalance}). Funding with 5 TRX...`);
+  // ⚠️ STEP 1: Activate account ONLY IF NEW
+  if (currentTrxBalance < 0.1) {
+    console.log(
+      `🟡 [ACTIVATE] New address detected. Sending 1 TRX to activate...`,
+    );
+
     try {
-      const fundTxId = await sendTrx(depositAddress, 5);
-      console.log(`✅ [SWEEP] Gas funded: ${fundTxId}`);
-      console.log(`⏳ [SWEEP] Waiting ${SWEEP_DELAY_MS / 1000}s for confirmation...`);
-      await new Promise((r) => setTimeout(r, SWEEP_DELAY_MS));
-    } catch (e: any) {
-      console.error(`❌ [SWEEP] Gas funding failed: ${e?.message}`);
-      // Attempt sweep anyway — may still work
+      const txId = await sendTrx(depositAddress, 1); // ✅ ONLY 1 TRX (not 5)
+      console.log(`✅ [ACTIVATE] Address activated: ${txId}`);
+
+      // wait small time for confirmation
+      await new Promise((r) => setTimeout(r, 5000));
+    } catch (err: any) {
+      console.error("❌ [ACTIVATE ERROR FULL]:", err);
+      return null;
     }
+  } else {
+    console.log(`⚡ [ENERGY] Using rented energy — no TRX funding needed`);
   }
 
+  // ⚡ STEP 2: SWEEP USING ENERGY
   try {
-    console.log(`🔁 [SWEEP] Sweeping ${usdtBalance} USDT → ${hotWalletAddress}`);
-    // ✅ Pass the deposit address's private key (from Convex, not keystore)
-    const sweepRes = await sweepUsdtFromAddress(depositAddress, hotWalletAddress, depositPrivateKey);
-    if (sweepRes?.txId) {
-      console.log(`✅ [SWEEP] txId: ${sweepRes.txId}, amount: ${sweepRes.amount}`);
-      return sweepRes;
+    console.log(
+      `🔁 [SWEEP] Sweeping ${usdtBalance} USDT → ${hotWalletAddress}`,
+    );
+
+    const sweepRes = await sweepUsdtFromAddress(
+      depositAddress,
+      hotWalletAddress,
+      depositPrivateKey,
+    );
+
+    console.log("🚀 [SWEEP RESULT]:", sweepRes);
+
+    if (!sweepRes?.txId) {
+      throw new Error("No txId returned from sweep");
     }
-    console.warn(`⚠️ [SWEEP] No txId returned`);
-    return null;
-  } catch (e: any) {
-    console.error(`❌ [SWEEP] Failed: ${e?.message}`);
+
+    return sweepRes;
+  } catch (err: any) {
+    console.error("❌ [SWEEP ERROR FULL]:", err);
     return null;
   }
 }
 
 async function recordAndConfirmDeposit(params: {
-  userId:           string;
-  depositAddress:   string;
-  txHash:           string;
-  amount:           number;
+  userId: string;
+  depositAddress: string;
+  txHash: string;
+  amount: number;
   sweptToHotWallet: boolean;
 }): Promise<string | null> {
   try {
     const depositId = await convex.mutation(api.deposit.recordDeposit, {
-      userId:          params.userId as Id<"user">,
-      network:         "trc20",
-      amount:          params.amount,
-      walletAddress:   params.depositAddress,
+      userId: params.userId as Id<"user">,
+      network: "trc20",
+      amount: params.amount,
+      walletAddress: params.depositAddress,
       transactionHash: params.txHash,
     });
 
     await convex.mutation(api.deposit.updateDepositStatus, {
       transactionHash: params.txHash,
-      status:          "completed",
+      status: "completed",
     });
 
-    console.log(`✅ [DB] $${params.amount.toFixed(4)} USDT | hash: ${params.txHash} | swept: ${params.sweptToHotWallet}`);
+    console.log(
+      `✅ [DB] $${params.amount.toFixed(4)} USDT | hash: ${params.txHash} | swept: ${params.sweptToHotWallet}`,
+    );
     return depositId;
   } catch (e: any) {
     console.error(`❌ [DB] Failed to record ${params.txHash}: ${e?.message}`);
@@ -119,14 +137,14 @@ export async function GET(req: Request) {
     if (!depositAddress) {
       return NextResponse.json(
         { error: "No deposit address found. Visit the Deposit page first." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // ✅ Load the deposit address private key from Convex (no keystore)
     const depositPrivateKey = user.depositPrivateKeys?.trc20;
-    const hotWalletAddress  = process.env.MAIN_WALLET_ADDRESS;
-    const canSweep          = !!(depositPrivateKey && hotWalletAddress);
+    const hotWalletAddress = process.env.MAIN_WALLET_ADDRESS;
+    const canSweep = !!(depositPrivateKey && hotWalletAddress);
 
     console.log(`\n${"─".repeat(60)}`);
     console.log(`👤 User:           ${session.user.contact}`);
@@ -135,15 +153,21 @@ export async function GET(req: Request) {
     console.log(`🔑 Has priv key:   ${!!depositPrivateKey}`);
     console.log(`🔑 Can sweep:      ${canSweep}`);
     if (!depositPrivateKey) {
-      console.warn(`⚠️  No private key in Convex for ${depositAddress} — sweep disabled`);
-      console.warn(`   This happens for addresses generated before the key-storage update.`);
-      console.warn(`   User must generate a new deposit address to enable auto-sweep.`);
+      console.warn(
+        `⚠️  No private key in Convex for ${depositAddress} — sweep disabled`,
+      );
+      console.warn(
+        `   This happens for addresses generated before the key-storage update.`,
+      );
+      console.warn(
+        `   User must generate a new deposit address to enable auto-sweep.`,
+      );
     }
     console.log(`${"─".repeat(60)}\n`);
 
-    const checkStartedAt  = Date.now();
-    const lastCheck       = user.lastDepositCheck ?? 0;
-    const alreadyCredited = user.depositAmount    ?? 0;
+    const checkStartedAt = Date.now();
+    const lastCheck = user.lastDepositCheck ?? 0;
+    const alreadyCredited = user.depositAmount ?? 0;
 
     const [trxPrice, balance, newTransactions] = await Promise.all([
       getTrxPriceInUsdt(),
@@ -151,18 +175,21 @@ export async function GET(req: Request) {
       getNewTransactions(depositAddress, lastCheck),
     ]);
 
-    const trxAsUsdt     = balance.trx * trxPrice;
+    const trxAsUsdt = balance.trx * trxPrice;
     const totalWalletUsdt = balance.usdt + trxAsUsdt;
 
     console.log(`💱 TRX price:  $${trxPrice}`);
-    console.log(`💰 Balance:    TRX ${balance.trx} ($${trxAsUsdt.toFixed(4)}) | USDT ${balance.usdt}`);
+    console.log(
+      `💰 Balance:    TRX ${balance.trx} ($${trxAsUsdt.toFixed(4)}) | USDT ${balance.usdt}`,
+    );
     console.log(`📊 New txs:    ${newTransactions.length}`);
 
     const deposits: any[] = [];
     let totalNewDepositAmount = 0;
 
     for (const tx of newTransactions) {
-      if ((tx?.to ?? "").toLowerCase() !== depositAddress.toLowerCase()) continue;
+      if ((tx?.to ?? "").toLowerCase() !== depositAddress.toLowerCase())
+        continue;
       if (!tx?.confirmed) {
         console.log(`⏳ Unconfirmed: ${tx?.txHash}`);
         continue;
@@ -175,24 +202,31 @@ export async function GET(req: Request) {
       const txAmountUsdt =
         tx?.type === "TRX" ? Number(tx?.amount) * trxPrice : Number(tx?.amount);
 
-      console.log(`\n🆕 Deposit: ${tx?.amount} ${tx?.type} = $${txAmountUsdt.toFixed(4)} | ${tx?.txHash}`);
+      console.log(
+        `\n🆕 Deposit: ${tx?.amount} ${tx?.type} = $${txAmountUsdt.toFixed(4)} | ${tx?.txHash}`,
+      );
 
-      let recordedTxHash   = tx?.txHash;
-      let recordedAmount   = txAmountUsdt;
+      let recordedTxHash = tx?.txHash;
+      let recordedAmount = txAmountUsdt;
       let sweptToHotWallet = false;
 
-      if (tx?.type === "TRC20" && canSweep && hotWalletAddress && depositPrivateKey) {
-        const sweepResult = await fundAndSweep(
+      if (
+        tx?.type === "TRC20" &&
+        canSweep &&
+        hotWalletAddress &&
+        depositPrivateKey
+      ) {
+        const sweepResult = await energyAwareSweep(
           depositAddress,
           hotWalletAddress,
-          depositPrivateKey,  // ✅ from Convex
+          depositPrivateKey,
           balance.trx,
-          balance.usdt
+          balance.usdt,
         );
 
         if (sweepResult) {
-          recordedTxHash   = sweepResult.txId;
-          recordedAmount   = sweepResult.amount;
+          recordedTxHash = sweepResult.txId;
+          recordedAmount = sweepResult.amount;
           sweptToHotWallet = true;
         }
       }
@@ -200,20 +234,20 @@ export async function GET(req: Request) {
       const depositId = await recordAndConfirmDeposit({
         userId: user._id,
         depositAddress,
-        txHash:          recordedTxHash,
-        amount:          recordedAmount,
+        txHash: recordedTxHash,
+        amount: recordedAmount,
         sweptToHotWallet,
       });
 
       if (depositId) {
         deposits.push({
-          id:             depositId,
-          txHash:         recordedTxHash,
+          id: depositId,
+          txHash: recordedTxHash,
           originalTxHash: sweptToHotWallet ? tx?.txHash : undefined,
-          amount:         recordedAmount,
+          amount: recordedAmount,
           originalAmount: tx?.amount,
-          type:           tx?.type,
-          timestamp:      tx?.timestamp,
+          type: tx?.type,
+          timestamp: tx?.timestamp,
           sweptToHotWallet,
         });
         totalNewDepositAmount += recordedAmount;
@@ -221,33 +255,41 @@ export async function GET(req: Request) {
     }
 
     // Fallback sweep — USDT is on-chain but no new txs detected
-    if (deposits.length === 0 && balance.usdt >= MIN_USDT_TO_SWEEP && canSweep && hotWalletAddress && depositPrivateKey) {
-      console.log(`\n🔍 [FALLBACK] ${balance.usdt} USDT sitting on address — attempting sweep`);
+    if (
+      deposits.length === 0 &&
+      balance.usdt >= MIN_USDT_TO_SWEEP &&
+      canSweep &&
+      hotWalletAddress &&
+      depositPrivateKey
+    ) {
+      console.log(
+        `\n🔍 [FALLBACK] ${balance.usdt} USDT sitting on address — attempting sweep`,
+      );
 
-      const sweepResult = await fundAndSweep(
+      const sweepResult = await energyAwareSweep(
         depositAddress,
         hotWalletAddress,
-        depositPrivateKey,  // ✅ from Convex
+        depositPrivateKey,
         balance.trx,
-        balance.usdt
+        balance.usdt,
       );
 
       if (sweepResult) {
         const depositId = await recordAndConfirmDeposit({
           userId: user._id,
           depositAddress,
-          txHash:           sweepResult.txId,
-          amount:           sweepResult.amount,
+          txHash: sweepResult.txId,
+          amount: sweepResult.amount,
           sweptToHotWallet: true,
         });
 
         if (depositId) {
           deposits.push({
-            id:              depositId,
-            txHash:          sweepResult.txId,
-            amount:          sweepResult.amount,
+            id: depositId,
+            txHash: sweepResult.txId,
+            amount: sweepResult.amount,
             sweptToHotWallet: true,
-            source:          "fallback-sweep",
+            source: "fallback-sweep",
           });
           totalNewDepositAmount += sweepResult.amount;
         }
@@ -257,16 +299,18 @@ export async function GET(req: Request) {
     if (totalNewDepositAmount > 0.001) {
       const newTotal = alreadyCredited + totalNewDepositAmount;
       await convex.mutation(api.user.updateUserBalance, {
-        userId:        user._id,
+        userId: user._id,
         depositAmount: newTotal,
       });
-      console.log(`\n💳 Credited $${totalNewDepositAmount.toFixed(4)} — new total: $${newTotal.toFixed(4)}`);
+      console.log(
+        `\n💳 Credited $${totalNewDepositAmount.toFixed(4)} — new total: $${newTotal.toFixed(4)}`,
+      );
     } else {
       console.log(`\nℹ️ No new deposits`);
     }
 
     await convex.mutation(api.deposit.updateLastDepositCheck, {
-      userId:    user._id,
+      userId: user._id,
       timestamp: checkStartedAt,
     });
     console.log(`🕐 lastCheck → ${new Date(checkStartedAt).toISOString()}\n`);
@@ -274,19 +318,19 @@ export async function GET(req: Request) {
     return NextResponse.json({
       address: depositAddress,
       balance: { ...balance, trxAsUsdt, totalUsdt: totalWalletUsdt },
-      newDeposits:      deposits,
+      newDeposits: deposits,
       totalNewDeposits: deposits.length,
-      credited:         totalNewDepositAmount > 0.001 ? totalNewDepositAmount : 0,
+      credited: totalNewDepositAmount > 0.001 ? totalNewDepositAmount : 0,
     });
-
   } catch (error: any) {
     console.error("❌ Deposit check failed:", error?.message);
     return NextResponse.json(
       {
-        error:   "Failed to check deposits",
-        details: process.env.NODE_ENV === "development" ? error?.message : undefined,
+        error: "Failed to check deposits",
+        details:
+          process.env.NODE_ENV === "development" ? error?.message : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
