@@ -126,28 +126,8 @@ export async function sweepUsdtFromAddress(
     return null;
   }
 
-  const MIN_GAS_SUN = 5_000_000;
-  let trxSun = 0;
-  try {
-    trxSun = await tw.trx.getBalance(depositAddress);
-    console.log(`[SWEEP] TRX: ${trxSun / 1e6}`);
-  } catch (e: any) {
-    console.warn(`[SWEEP] Cannot read TRX balance: ${e?.message}`);
-  }
-
-  if (trxSun < MIN_GAS_SUN) {
-    const needed = MIN_GAS_SUN / 1e6;
-    console.log(`[SWEEP] ⚡ Funding ${needed} TRX for gas...`);
-    const fundTxId = await sendTrx(depositAddress, needed, false);
-    console.log(`[SWEEP] ✅ Gas funded: ${fundTxId}`);
-    await new Promise((r) => setTimeout(r, 3_000));
-    try {
-      const newSun = await tw.trx.getBalance(depositAddress);
-      console.log(`[SWEEP] TRX after funding: ${newSun / 1e6}`);
-    } catch (_) {}
-  } else {
-    console.log(`[SWEEP] ✅ Sufficient TRX`);
-  }
+  // ⚡ Using rented energy only — no TRX gas funding
+  console.log(`[SWEEP] ⚡ Using rented energy — skipping TRX funding`);
 
   console.log(`[SWEEP] Calling transfer(${hotWalletAddress}, ${rawAmount})...`);
   let transferResult: unknown;
