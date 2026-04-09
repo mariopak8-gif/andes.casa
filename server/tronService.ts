@@ -34,7 +34,9 @@ export async function waitForConfirmation(tronWeb: any, txId: string, attempts =
         console.log(`[CONFIRM] ✅ Block ${info.blockNumber} (attempt ${i})`);
         return info;
       }
-    } catch (_) {}
+    } catch (e: any) {
+      console.debug(`[CONFIRM] Attempt ${i} - query failed: ${e?.message}`);
+    }
     console.log(`[CONFIRM] ${i}/${attempts} — pending`);
     await new Promise((r) => setTimeout(r, delayMs));
   }
@@ -52,8 +54,10 @@ export async function sendTrx(toAddress: string, amountTrx = TRX_FUND_AMOUNT, sk
   try {
     result = await tw.trx.sendTransaction(toAddress, sun);
   } catch (e: any) {
-    console.error(`[TRX SEND] ❌ ${e?.message}`);
-    throw e;
+    const errMsg = e?.message || JSON.stringify(e);
+    console.error(`[TRX SEND] ❌ Network error: ${errMsg}`);
+    console.error(`[TRX SEND] Full error:`, e);
+    throw new Error(`[TRX SEND] sendTransaction failed: ${errMsg}`);
   }
 
   console.log(`[TRX SEND] Raw result:`, JSON.stringify(result, null, 2));
@@ -106,7 +110,9 @@ export async function sweepUsdtFromAddress(
     contract = await tw.contract().at(ACTIVE_USDT_CONTRACT);
     console.log(`[SWEEP] ✅ Contract loaded`);
   } catch (e: any) {
-    throw new Error(`[SWEEP] Failed to load contract: ${e?.message ?? JSON.stringify(e)}`);
+    const errMsg = e?.message || JSON.stringify(e);
+    console.error(`[SWEEP] ❌ Contract load failed: ${errMsg}`);
+    throw new Error(`[SWEEP] Failed to load contract at ${ACTIVE_USDT_CONTRACT}: ${errMsg}`);
   }
 
   let rawBalance: any;
@@ -114,7 +120,9 @@ export async function sweepUsdtFromAddress(
     rawBalance = await contract.balanceOf(depositAddress).call();
     console.log(`[SWEEP] Raw balance: ${rawBalance?.toString()}`);
   } catch (e: any) {
-    throw new Error(`[SWEEP] balanceOf() failed: ${e?.message ?? JSON.stringify(e)}`);
+    const errMsg = e?.message || JSON.stringify(e);
+    console.error(`[SWEEP] ❌ Balance query failed: ${errMsg}`);
+    throw new Error(`[SWEEP] balanceOf(${depositAddress}) failed: ${errMsg}`);
   }
 
   const rawAmount  = Number(rawBalance.toString());
@@ -137,10 +145,12 @@ export async function sweepUsdtFromAddress(
   } catch (e: any) {
     console.error(`[SWEEP] ❌ transfer failed:`);
     console.error(`  message:     ${e?.message}`);
+    console.error(`  code:        ${e?.code}`);
     console.error(`  output:      ${JSON.stringify(e?.output)}`);
     console.error(`  transaction: ${JSON.stringify(e?.transaction)}`);
     console.error(`  full:`, JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
-    throw e;
+    const errMsg = e?.message || JSON.stringify(e);
+    throw new Error(`[SWEEP] transfer(${hotWalletAddress}, ${rawAmount}) failed: ${errMsg}`);
   }
 
   const txId = extractTxId(transferResult);
@@ -151,7 +161,9 @@ export async function sweepUsdtFromAddress(
     await waitForConfirmation(tw, txId);
     console.log(`[SWEEP] ✅ Confirmed`);
   } catch (e: any) {
-    console.warn(`[SWEEP] ⚠️  Timeout (tx submitted): ${e?.message}`);
+    const errMsg = e?.message || JSON.stringify(e);
+    console.warn(`[SWEEP] ⚠️  Confirmation timeout (tx submitted): ${errMsg}`);
+    console.warn(`[SWEEP] ⚠️  Please verify on-chain at: https://tronscan.org/#/transaction/${txId}`);
   }
 
   console.log(`[SWEEP] ✅ Swept ${usdtAmount} USDT → ${hotWalletAddress}`);
