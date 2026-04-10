@@ -11,7 +11,10 @@ export async function POST(request: Request) {
     if (!contact || !password) {
       return Response.json(
         { error: "Phone number and password are required" },
-        { status: 400 }
+        { 
+          status: 400,
+          headers: { "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -20,13 +23,16 @@ export async function POST(request: Request) {
       contact,
       password, // raw password — Convex hashes and compares internally
     });
-    console.log({result});
+    console.log('[convex-auth] Authentication result:', result.success ? 'SUCCESS' : 'FAILED');
     
     if (!result.success || !result.user) {
       console.log("[convex-auth] Auth failed:", result.error);
       return Response.json(
         { error: result.error || "Invalid credentials" },
-        { status: 401 }
+        { 
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        }
       );
     }
 
@@ -36,18 +42,30 @@ export async function POST(request: Request) {
         result.user.countryCode, "vs", countryCode);
       return Response.json(
         { error: "Invalid credentials" },
-        { status: 401 }
+        { 
+          status: 401,
+          headers: { "Content-Type": "application/json" }
+        }
       );
     }
 
     console.log("[convex-auth] Auth successful:", contact);
-    return Response.json({ user: result.user });
+    return Response.json(
+      { user: result.user },
+      { 
+        status: 200,
+        headers: { "Content-Type": "application/json" }
+      }
+    );
 
   } catch (error: any) {
     console.error("[convex-auth] Unexpected error:", error);
     return Response.json(
       { error: "Authentication service unavailable" },
-      { status: 500 }
+      { 
+        status: 500,
+        headers: { "Content-Type": "application/json" }
+      }
     );
   }
 }

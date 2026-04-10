@@ -41,24 +41,29 @@ async function energyFirstSweep(
     return null;
   }
 
-  // STEP 1: Only activate new address if TRX < 0.1
-  if (currentTrxBalance < 0.1) {
+  // STEP 1: Only activate if address is truly new (no USDT and no TRX)
+  // If USDT exists, address is already activated
+  let activationFailed = false;
+  if (usdtBalance === 0 && currentTrxBalance < 0.1) {
     console.log(`🟡 [ACTIVATE] New address detected. Sending 1 TRX to activate...`);
     try {
       const txId = await sendTrx(depositAddress, 1);
       console.log(`✅ [ACTIVATE] Address activated: ${txId}`);
       await new Promise(r => setTimeout(r, 5000));
     } catch (err: any) {
-      console.error("❌ [ACTIVATE ERROR]:", err);
-      return null;
+      console.warn(`⚠️ [ACTIVATE WARNING] Activation failed (hot wallet may lack TRX): ${err?.message}`);
+      console.warn(`⚠️ [ACTIVATE] Attempting sweep anyway with available energy...`);
+      activationFailed = true;
     }
+  } else if (usdtBalance > 0) {
+    console.log(`✅ [ACTIVATED] Address already active (has ${usdtBalance} USDT) — sweeping...`);
   } else {
-    console.log(`⚡ [ENERGY] Address active — using rented energy, no TRX funding`);
+    console.log(`⚡ [ENERGY] Address has low TRX — using rented energy for sweep`);
   }
 
   // STEP 2: Sweep USDT using rented energy only (no TRX gas funding)
   try {
-    console.log(`🔁 [SWEEP] Sweeping ${usdtBalance} USDT → ${hotWalletAddress}`);
+    console.log(`🔁 [SWEEP] Sweeping ${usdtBalance} USDT → ${hotWalletAddress}${activationFailed ? ' (no activation)' : ''}`);
     const sweepRes = await sweepUsdtFromAddress(
       depositAddress,
       hotWalletAddress,
@@ -70,7 +75,12 @@ async function energyFirstSweep(
     console.log(`✅ [SWEEP] Swept ${sweepRes.amount} USDT → ${hotWalletAddress}`);
     return sweepRes;
   } catch (err: any) {
-    console.error("❌ [SWEEP ERROR]:", err?.message ?? err);
+    if (activationFailed) {
+      console.error(`❌ [SWEEP FAILED] Activation was required but failed. Hot wallet TRX status:`);
+      console.error(`   → To fix: Fund hot wallet (${hotWalletAddress}) with TRX`);
+    } else {
+      console.error("❌ [SWEEP ERROR]:", err?.message ?? err);
+    }
     return null;
   }
 }
@@ -132,10 +142,25 @@ export async function GET(req: Request) {
     const hotWalletAddress = process.env.MAIN_WALLET_ADDRESS;
     const canSweep = !!(depositPrivateKey && hotWalletAddress);
 
+    // Check hot wallet TRX balance for activation capacity
+    let hotWalletHasActivationTrx = false;
+    if (hotWalletAddress) {
+      try {
+        const hotWalletBalance = await getAccountBalance(hotWalletAddress);
+        hotWalletHasActivationTrx = hotWalletBalance.trx >= 1;
+        if (!hotWalletHasActivationTrx) {
+          console.warn(`⚠️ [HOT WALLET] Insufficient TRX for activation: ${hotWalletBalance.trx} TRX`);
+        }
+      } catch (e) {
+        console.warn(`⚠️ [HOT WALLET] Could not check balance: ${e}`);
+      }
+    }
+
     console.log(`\n${"─".repeat(60)}`);
     console.log(`👤 User:           ${session.user.contact}`);
     console.log(`📥 Deposit addr:   ${depositAddress}`);
     console.log(`🔥 Hot wallet:     ${hotWalletAddress ?? "NOT SET"}`);
+    console.log(`💰 Activation TRX: ${hotWalletHasActivationTrx ? "✅ READY" : "❌ INSUFFICIENT"}`);
     console.log(`🔑 Has priv key:   ${!!depositPrivateKey}`);
     console.log(`🔑 Can sweep:      ${canSweep}`);
     console.log(`${"─".repeat(60)}\n`);

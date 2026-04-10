@@ -87,11 +87,35 @@ export async function safeFetch(
       );
     }
 
+    const contentType = response.headers.get('content-type');
+    if (!contentType?.includes('application/json')) {
+      throw new AuthenticationError(
+        `${context} returned invalid content-type: ${contentType}`,
+      );
+    }
+
     return await response.json();
   } catch (error) {
     logger.error(context, error);
     throw error;
   }
+}
+
+// Helper to get base URL
+function getBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  
+  if (process.env.NEXTAUTH_URL) {
+    return process.env.NEXTAUTH_URL;
+  }
+  
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  
+  return 'http://localhost:3000';
 }
 
 export const authOptions: NextAuthOptions = {
@@ -108,34 +132,43 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Phone number and password are required");
         }
 
-        // ✅ This is why it "sometimes" fails — relative URL has no base in SSR
-        const baseUrl =
-          process.env.NEXTAUTH_URL ??
-          (process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : "http://localhost:3000");
+        const baseUrl = getBaseUrl();
+        console.log('[Auth] Using base URL:', baseUrl);
 
-        console.log({credentials,baseUrl})
         try {
           const response = await fetch(`${baseUrl}/api/auth/convex-auth`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { 
+              "Content-Type": "application/json",
+              "Accept": "application/json",
+            },
             body: JSON.stringify({
               contact: credentials.contact,
               password: credentials.password,
               countryCode: credentials.countryCode ?? "",
             }),
+            // Ensure no caching issues
+            cache: 'no-store',
           });
 
-          const result = await response.json().catch(() => null);
+          // Check content type first to avoid JSON parse errors
+          const contentType = response.headers.get('content-type');
+          if (!contentType?.includes('application/json')) {
+            console.error('[Auth] Invalid content-type:', contentType);
+            const text = await response.text();
+            console.error('[Auth] Response body:', text.substring(0, 200));
+            throw new Error(`Invalid response from auth endpoint (${response.status})`);
+          }
+
+          const result = await response.json();
 
           if (!response.ok || !result?.user) {
-            // ✅ Throw real message — NextAuth will pass it as ?error= on sign-in page
             throw new Error(result?.error ?? "Invalid credentials");
           }
 
           return result.user;
         } catch (error: any) {
+          logger.error("Authorization", error);
           throw new Error(error.message ?? "Authentication failed");
         }
       },
