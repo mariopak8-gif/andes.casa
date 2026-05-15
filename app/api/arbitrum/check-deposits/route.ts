@@ -1,4 +1,4 @@
-// api/arbitrum/check-deposits/route.ts
+// app/api/arbitrum/check-deposits/route.ts
 // ✅ ARBITRUM ONLY — TRC20/TRON removed
 
 import axios from "axios";
@@ -8,6 +8,7 @@ import { authOptions } from "@/auth";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
 import { getAccountBalance, getNewTransactions } from "@/lib/arbitrum/utils";
+import { ETH_GAS_TOPUP_USD } from '@/lib/arbitrum/config';
 import { sendEth, sweepUsdtFromAddress } from "../../../../server/arbitrumService";
 import { Id } from "@/convex/_generated/dataModel";
 
@@ -35,19 +36,24 @@ async function energyFirstSweep(
   hotWalletAddress: string,
   depositPrivateKey: string,
   currentEthBalance: number,
-  usdtBalance: number
+  usdtBalance: number,
+  ethPrice: number
 ): Promise<{ txId: string; amount: number } | null> {
   if (usdtBalance < MIN_USDT_TO_SWEEP) {
     console.log(`⏭️ [SWEEP] Balance too small (${usdtBalance}) — skipping`);
     return null;
   }
 
-  // STEP 1: Fund ETH if needed for gas
+  // STEP 1: Fund ETH only when the deposit address has less than the configured USD gas buffer
   let gasFailure = false;
-  if (usdtBalance > 0 && currentEthBalance < 0.001) {
-    console.log(`🟡 [GAS] Insufficient ETH. Sending 0.001 ETH for gas...`);
+  const ethValueInUsd = currentEthBalance * ethPrice;
+  if (usdtBalance > 0 && ethValueInUsd < ETH_GAS_TOPUP_USD) {
+    const amountToSend = ETH_GAS_TOPUP_USD / ethPrice; // Send configured USD amount of ETH
+    console.log(
+      `🟡 [GAS] Deposit address ETH value ($${ethValueInUsd.toFixed(4)}) < $${ETH_GAS_TOPUP_USD.toFixed(2)}. Funding ${amountToSend.toFixed(6)} ETH ($${ETH_GAS_TOPUP_USD.toFixed(2)}) for gas...`
+    );
     try {
-      const txId = await sendEth(depositAddress, 0.001);
+      const txId = await sendEth(depositAddress, amountToSend);
       console.log(`✅ [GAS] Address funded: ${txId}`);
       await new Promise(r => setTimeout(r, 5000));
     } catch (err: any) {
@@ -56,7 +62,7 @@ async function energyFirstSweep(
       gasFailure = true;
     }
   } else if (usdtBalance > 0) {
-    console.log(`✅ [READY] Address has sufficient ETH (${currentEthBalance}) — sweeping...`);
+    console.log(`✅ [READY] Deposit address has sufficient ETH value ($${ethValueInUsd.toFixed(4)}) — skipping extra gas funding.`);
   } else {
     console.log(`⚡ [SWEEP] Address has low ETH balance — will attempt to fund`);
   }
@@ -89,29 +95,36 @@ async function recordAndConfirmDeposit(params: {
   userId: string;
   depositAddress: string;
   txHash: string;
+  originalTxHash?: string;
   amount: number;
   sweptToHotWallet: boolean;
 }): Promise<string | null> {
   try {
+    const transactionHash = params.originalTxHash || params.txHash;
+
     const depositId = await convex.mutation(api.deposit.recordDeposit, {
       userId: params.userId as Id<"user">,
-      network: "trc20",
+      network: "arbitrum",
       amount: params.amount,
       walletAddress: params.depositAddress,
-      transactionHash: params.txHash,
+      transactionHash,
     });
 
     await convex.mutation(api.deposit.updateDepositStatus, {
-      transactionHash: params.txHash,
+      transactionHash,
       status: "completed",
     });
 
     console.log(
-      `✅ [DB] $${params.amount.toFixed(4)} USDT | hash: ${params.txHash} | swept: ${params.sweptToHotWallet}`
+      `✅ [DB] $${params.amount.toFixed(4)} USDT | hash: ${transactionHash} | swept: ${params.sweptToHotWallet}`
     );
+    if (params.sweptToHotWallet && params.originalTxHash) {
+      console.log(`   Original deposit tx: ${params.originalTxHash}`);
+      console.log(`   Sweep tx id: ${params.txHash}`);
+    }
     return depositId;
   } catch (e: any) {
-    console.error(`❌ [DB] Failed to record ${params.txHash}: ${e?.message}`);
+    console.error(`❌ [DB] Failed to record ${params.originalTxHash || params.txHash}: ${e?.message}`);
     return null;
   }
 }
@@ -130,7 +143,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    // ✅ Use Arbitrum deposit address (not TRC20)
+    // ✅ Use Arbitrum deposit address
     const depositAddress = user.depositAddresses?.arbitrum;
     if (!depositAddress) {
       return NextResponse.json(
@@ -215,7 +228,8 @@ export async function GET(req: Request) {
           hotWalletAddress!,
           depositPrivateKey!,
           balance.eth,
-          balance.usdt
+          balance.usdt,
+          ethPrice
         );
 
         if (sweepResult) {
@@ -229,6 +243,7 @@ export async function GET(req: Request) {
         userId: user._id,
         depositAddress,
         txHash: recordedTxHash,
+        originalTxHash: sweptToHotWallet ? tx?.txHash : undefined,
         amount: recordedAmount,
         sweptToHotWallet,
       });
@@ -259,7 +274,8 @@ export async function GET(req: Request) {
         hotWalletAddress!,
         depositPrivateKey!,
         balance.eth,
-        balance.usdt
+        balance.usdt,
+        ethPrice
       );
 
       if (sweepResult) {

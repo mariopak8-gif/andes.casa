@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from "@/auth";
-import { getTronWeb, getAccountBalance, isValidTronAddress, isValidPrivateKey, getAddressFromPrivateKey } from '@/lib/tron/utils';
+import { getAccountBalance, getTronWeb, isValidPrivateKey, getAddressFromPrivateKey, isValidTronAddress } from '@/lib/tron/utils';
 import { ACTIVE_USDT_CONTRACT } from '@/lib/tron/config';
+import { ethers } from 'ethers';
 
 /**
  * GET: Debug endpoint to verify hot wallet setup and address formats
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
       );
     }
 
-    const privateKey = process.env.TRON_PRIVATE_KEY;
+    const privateKey = process.env.MAIN_WALLET_PRIVATE_KEY;
     if (!privateKey) {
       return NextResponse.json({
         success: false,

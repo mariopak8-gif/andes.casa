@@ -20,7 +20,7 @@ export function useDepositAddress({ userId }: UseDepositAddressProps) {
   );
 
   const generateAddress = useCallback(
-    async (network: "trc20" | "bep20" | "erc20" | "polygon") => {
+    async (network: "arbitrum" | "trc20" | "bep20" | "erc20" | "polygon") => {
       if (!userId) {
         toast.error("User not authenticated");
         return null;
@@ -30,14 +30,31 @@ export function useDepositAddress({ userId }: UseDepositAddressProps) {
       setError(null);
 
       try {
-        // GET /api/deposit/address handles everything:
+        const endpoint = (() => {
+          switch (network) {
+            case 'arbitrum':
+              return '/api/arbitrum/deposit/address';
+            case 'trc20':
+              return '/api/tron/deposit/address';
+            default:
+              throw new Error(`Unsupported deposit network: ${network}`);
+          }
+        })();
+
+        // GET /api/<network>/deposit/address handles everything:
         // - returns existing address if already generated
         // - generates new address + saves address AND private key to Convex
-        const response = await fetch("/api/tron/deposit/address");
+        const response = await fetch(endpoint);
 
         if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || `HTTP ${response.status}`);
+          const text = await response.text().catch(() => '');
+          let err: any = {};
+          try {
+            err = JSON.parse(text || '{}');
+          } catch {
+            err = { error: text || `HTTP ${response.status}` };
+          }
+          throw new Error(err.error || err.message || `HTTP ${response.status}: ${text}`);
         }
 
         const data = await response.json();

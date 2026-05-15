@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 export function DepositCard({
   loading,
   checking,
+  cooldownSeconds,
   qrSrc,
   shortAddress,
   userAddress,
@@ -13,13 +14,13 @@ export function DepositCard({
   onCheckDeposit,
   onGenerateAddress,
 }: any) {
-  // Determine activation status
-  const isTrone = depositInfo.id === 'trc20';
-  const trxBalance = walletBalance?.trx ?? 0;
+  // ✅ Determine network and balance status (Arbitrum)
+  const isArbitrum = depositInfo.id === 'arbitrum';
+  const ethBalance = walletBalance?.eth ?? 0;
   const usdtBalance = walletBalance?.usdt ?? 0;
   const totalUsdt = walletBalance?.totalUsdt ?? 0; // Use the combined total if available
   
-  const showActivationWarning = isTrone && walletBalance !== null && trxBalance < 1;
+  const showActivationWarning = isArbitrum && walletBalance !== null && ethBalance < 0.001;
 
   if (loading && !checking) {
      return (
@@ -139,7 +140,7 @@ export function DepositCard({
              
              <button
                 onClick={onCheckDeposit}
-                disabled={checking}
+                disabled={checking || (cooldownSeconds || 0) > 0}
                 className="relative w-full group overflow-hidden bg-gradient-to-r from-cyan-600 to-indigo-600 text-white p-4 rounded-xl font-semibold shadow-lg shadow-cyan-500/20 transition-all hover:scale-[1.01] active:scale-[0.99] disabled:opacity-70 disabled:grayscale disabled:cursor-not-allowed border border-transparent"
              >
                 {/* Shimmer effect */}
@@ -153,6 +154,11 @@ export function DepositCard({
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                            </svg>
                            <span className="tracking-wide text-sm">Scanning Blockchain...</span>
+                        </>
+                    ) : cooldownSeconds > 0 ? (
+                        <>
+                           <svg className="w-5 h-5 text-cyan-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" /></svg>
+                           <span className="tracking-wide text-sm">Wait {cooldownSeconds}s to retry</span>
                         </>
                     ) : (
                         <>

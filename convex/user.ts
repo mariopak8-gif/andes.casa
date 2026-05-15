@@ -17,7 +17,7 @@ export const authenticateUser = query({
     console.log({ args });
     const user = await ctx.db
       .query("user")
-      .withIndex("by_contact", (q) => q.eq("contact", args.contact))
+      .filter((q) => q.eq(q.field("contact"), args.contact))
       .first();
 
     if (!user || !user.password) {
@@ -55,7 +55,7 @@ export const getWithdrawPageData = query({
 
     const user = await ctx.db
       .query("user")
-      .withIndex("by_contact", (q) => q.eq("contact", args.contact))
+      .filter((q) => q.eq(q.field("contact"), args.contact))
       .first();
 
     if (!user) return null;
@@ -73,13 +73,8 @@ export const getWithdrawPageData = query({
       : null;
 
     // Transaction password lock (after reset)
-    const changedAt = user.transactionPasswordChangedAt;
-    const isPasswordLocked = changedAt
-      ? now - changedAt < TWENTY_FOUR_HOURS
-      : false;
-    const lockTimeRemaining = changedAt
-      ? Math.max(0, TWENTY_FOUR_HOURS - (now - changedAt))
-      : null;
+    const isPasswordLocked = false;
+    const lockTimeRemaining = null;
 
     // Recent withdrawals
     const withdrawals = await ctx.db
@@ -136,8 +131,8 @@ export const getUserByInvitationCode = query({
   handler: async (ctx, args) => {
     return await ctx.db
       .query("user")
-      .withIndex("by_InvitationCode", (q) =>
-        q.eq("invitationCode", args.invitationCde),
+      .filter((q) =>
+        q.eq(q.field("invitationCode"), args.invitationCde),
       )
       .first();
   },
@@ -201,6 +196,23 @@ export const getAllUsers = query({
 });
 
 /**
+ * Get user's saved withdrawal preferences
+ */
+export const getSavedWithdrawalPreferences = query({
+  args: { userId: v.id("user") },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      return null;
+    }
+    return {
+      savedWithdrawalAddress: user.savedWithdrawalAddress,
+      savedTransactionPassword: user.savedTransactionPassword,
+    };
+  },
+});
+
+/**
  * Update last deposit check timestamp for a user
  */
 export const updateLastDepositCheck = mutation({
@@ -249,6 +261,33 @@ export const updateUserBalance = mutation({
   },
 });
 /**
+ * Save user's withdrawal preferences for autofill
+ */
+export const saveWithdrawalPreferences = mutation({
+  args: {
+    userId: v.id("user"),
+    savedWithdrawalAddress: v.optional(v.string()),
+    savedTransactionPassword: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db.get(args.userId);
+    if (!user) {
+      throw new ConvexError("User not found");
+    }
+
+    const { userId, ...fields } = args;
+
+    const updateData = Object.fromEntries(
+      Object.entries(fields).filter(([_, v]) => v !== undefined),
+    );
+
+    await ctx.db.patch(userId, updateData);
+
+    return { success: true };
+  },
+});
+
+/**
  * Register a new user with password hashing
  */
 export const registerUser = mutation({
@@ -277,8 +316,8 @@ export const registerUser = mutation({
       if (args.invitationCode) {
         const referrer = await ctx.db
           .query("user")
-          .withIndex("by_InvitationCode", (q) =>
-            q.eq("invitationCode", args.invitationCode!),
+          .filter((q) =>
+            q.eq(q.field("invitationCode"), args.invitationCode!),
           )
           .first();
         if (referrer) {
@@ -617,10 +656,11 @@ export const _performTransactionPasswordReset = mutation({
       // Hash the new transaction password using simple hash
       const hashedTransactionPassword = simpleHash(args.newTransactionPassword);
 
-      // Update user with new transaction password, clear reset token, and set 24hr lock
+      // Update user with new transaction password and clear reset token.
+      // Do not set a withdrawal lock after reset.
       await ctx.db.patch(user._id, {
         transactionPassword: hashedTransactionPassword,
-        transactionPasswordChangedAt: Date.now(), // Set 24hr withdrawal lock
+        transactionPasswordChangedAt: undefined,
         resetToken: undefined,
         resetTokenExpiry: undefined,
       });

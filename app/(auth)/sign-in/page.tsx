@@ -12,55 +12,9 @@ export default function SignInPage() {
   const [countryCode, setCountryCode] = useState("+1");
   const [password, setPassword] = useState("");
   const [language, setLanguage] = useState("en");
-  const [locationCountry, setLocationCountry] = useState<string | null>(null);
-  const [phoneCountryDetected, setPhoneCountryDetected] = useState<
-    string | null
-  >(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  // Validation states
-  const [locationMismatch, setLocationMismatch] = useState<boolean | null>(
-    null,
-  );
   const [showTxPassword, setShowTxPassword] = useState(false);
-  // Browser geolocation + reverse geocoding helpers
-  const reverseGeocode = async (lat: number, lon: number) => {
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
-      );
-      if (!res.ok) return null;
-      const json = await res.json();
-      const cc = json?.address?.country_code;
-      return cc ? cc.toUpperCase() : null;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const getCurrentPositionAsync = () =>
-    new Promise<GeolocationPosition>((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        timeout: 10000,
-      }),
-    );
-
-  React.useEffect(() => {
-    (async () => {
-      if (typeof window !== "undefined" && "geolocation" in navigator) {
-        try {
-          const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(
-            pos.coords.latitude,
-            pos.coords.longitude,
-          );
-          if (cc) setLocationCountry(cc);
-        } catch (err) {
-          // ignore; fallback to IP lookup on submit
-        }
-      }
-    })();
-  }, []);
   const [phoneValid, setPhoneValid] = useState<boolean | null>(null);
   const [passwordValid, setPasswordValid] = useState<boolean | null>(null);
 
@@ -84,45 +38,14 @@ export default function SignInPage() {
     setError(null);
     if (!phoneNumber || !password)
       return setError("Please provide phone number and password");
-    // Detect location: prefer browser geolocation (if available), otherwise fall back to IP lookup
-    if (!locationCountry) {
-      try {
-        const res = await fetch("https://ipapi.co/json");
-        if (res.ok) {
-          const json = await res.json();
-          setLocationCountry(json?.country || null);
-        }
-      } catch (err) {
-        // ignoreJdelivery
-      }
-
-      // If still no country, try browser geolocation as a last resort
-      if (
-        !locationCountry &&
-        typeof window !== "undefined" &&
-        "geolocation" in navigator
-      ) {
-        try {
-          const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(
-            pos.coords.latitude,
-            pos.coords.longitude,
-          );
-          if (cc) setLocationCountry(cc);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
     // auto-detect country code
     if (phoneNumber) {
       const auto = parsePhoneNumberFromString(`${countryCode}${phoneNumber}`);
-      if (auto && auto.countryCallingCode) {
+      if (auto?.countryCallingCode) {
         const detected = `+${auto.countryCallingCode}`;
         if (detected !== countryCode) {
           setCountryCode(detected);
         }
-        if (auto.country) setPhoneCountryDetected(auto.country);
       }
     }
     if (!ALLOWED_COUNTRY_CODES.includes(countryCode))
@@ -130,14 +53,6 @@ export default function SignInPage() {
     const parsed = parsePhoneNumberFromString(`${countryCode}${phoneNumber}`);
     if (!parsed || parsed.countryCallingCode !== countryCode.replace("+", "")) {
       return setError("Phone number does not match country code");
-    }
-
-    // set mismatch flag if we can
-    if (parsed && parsed.country && locationCountry) {
-      setPhoneCountryDetected(parsed.country);
-      setLocationMismatch(parsed.country !== locationCountry);
-    } else {
-      setLocationMismatch(null);
     }
 
     (async () => {

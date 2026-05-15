@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from "@/auth";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { getTronWeb, getAccountBalance } from '@/lib/tron/utils';
+import { getAccountBalance, getAddressFromPrivateKey } from '@/lib/tron/utils';
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
@@ -33,8 +33,13 @@ export async function GET(req: Request) {
             );
         }
 
-        const tronWeb = getTronWeb();
-        const hotAddress = tronWeb.address.fromPrivateKey(privateKey);
+        const { address: hotAddress } = getAddressFromPrivateKey(privateKey);
+        if (!hotAddress) {
+            return NextResponse.json(
+                { error: 'Could not derive address from private key' },
+                { status: 500 }
+            );
+        }
         const hotWalletBal = await getAccountBalance(hotAddress);
 
         // 2. Get all users and their balances

@@ -1,5 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import { MIN_WITHDRAWAL } from "../constants";
 
 /**
  * Simple custom hash function matching convex/user.ts
@@ -16,11 +17,11 @@ function simpleHash(input: string): string {
 }
 
 // Minimum amounts per network
-const MIN_WITHDRAWAL: Record<string, number> = {
-  trc20: 100,
-  bep20: 2,
-  erc20: 20,
-  polygon: 2,
+const MIN_WITHDRAWAL_MAP: Record<string, number> = {
+  trc20: MIN_WITHDRAWAL,
+  bep20: MIN_WITHDRAWAL,
+  erc20: MIN_WITHDRAWAL,
+  polygon: MIN_WITHDRAWAL,
 };
 
 const MIN_DEPOSIT: Record<string, number> = {
@@ -88,7 +89,7 @@ export const createWithdrawal = mutation({
   },
   handler: async (ctx, args) => {
     // Validate minimum amount
-    const minAmount = MIN_WITHDRAWAL[args.network];
+    const minAmount = MIN_WITHDRAWAL_MAP[args.network];
     if (args.amount < minAmount) {
       throw new ConvexError(
         `Minimum withdrawal for ${args.network.toUpperCase()} is ${minAmount} USDT`

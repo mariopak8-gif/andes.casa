@@ -2,13 +2,14 @@
 
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useQuery } from "convex/react";
+import { useQuery, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import toast from "@/lib/clientToast";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+import { MIN_WITHDRAWAL } from "@/constants";
 
-const MIN_WITHDRAWAL = { trc20: 4 }; // Minimum withdrawal amounts per network
+const MIN_WITHDRAWAL_MAP = { erc20: MIN_WITHDRAWAL }; // Minimum withdrawal amounts per network
 
 function formatTimeRemaining(ms: number | null): string {
   if (!ms || ms <= 0) return "Ready";
@@ -26,7 +27,8 @@ export default function WithdrawContent() {
   const [loading, setLoading] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const network = "trc20";
+  const network = "erc20";
+  const saveWithdrawalPreferences = useMutation(api.user.saveWithdrawalPreferences);
 
   // ✅ ONE query replaces 7 — no waterfall
   const data = useQuery(
@@ -38,6 +40,40 @@ export default function WithdrawContent() {
   const canBypassPassword = data?.canBypassPassword ?? false;
   const isPasswordLocked = data?.isPasswordLocked ?? false;
   const withdrawals = data?.withdrawals;
+
+  const savedPreferences = useQuery(
+    api.user.getSavedWithdrawalPreferences,
+    user?._id ? { userId: user._id } : "skip",
+  );
+
+  const handleAddressFocus = () => {
+    if (!savedPreferences) return;
+
+    if (!address && savedPreferences.savedWithdrawalAddress) {
+      setAddress(savedPreferences.savedWithdrawalAddress);
+    }
+    if (!txPassword && savedPreferences.savedTransactionPassword) {
+      setTxPassword(savedPreferences.savedTransactionPassword);
+    }
+  };
+
+  useEffect(() => {
+    if (!savedPreferences) return;
+    
+    console.log('Auto-filling from saved preferences:', savedPreferences);
+    
+    // Auto-fill address if not already filled
+    if (!address && savedPreferences.savedWithdrawalAddress) {
+      console.log('Setting address to:', savedPreferences.savedWithdrawalAddress);
+      setAddress(savedPreferences.savedWithdrawalAddress);
+    }
+    
+    // Auto-fill password if not already filled
+    if (!txPassword && savedPreferences.savedTransactionPassword) {
+      console.log('Setting txPassword');
+      setTxPassword(savedPreferences.savedTransactionPassword);
+    }
+  }, [savedPreferences]);
 
   // ✅ Countdown timer — only starts once data arrives
   useEffect(() => {
@@ -76,8 +112,8 @@ export default function WithdrawContent() {
       toast.error(`Insufficient balance. Available: ${withdrawable.toFixed(2)} USDT`);
       return;
     }
-    if (parseFloat(amount) < MIN_WITHDRAWAL.trc20) {
-      toast.error(`Minimum withdrawal is ${MIN_WITHDRAWAL.trc20} USDT`);
+    if (parseFloat(amount) < MIN_WITHDRAWAL_MAP.erc20) {
+      toast.error(`Minimum withdrawal is ${MIN_WITHDRAWAL_MAP.erc20} USDT`);
       return;
     }
 
@@ -85,7 +121,7 @@ export default function WithdrawContent() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/tron/withdraw", {
+      const response = await fetch("/api/arbitrum/withdraw", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -112,6 +148,21 @@ export default function WithdrawContent() {
           setTxPassword(""); setServerError("Invalid transaction password."); return;
         }
         setServerError(msg); toast.error(msg); return;
+      }
+
+      
+      // Save withdrawal preferences for autofill on next visit
+      try {
+        console.log('Saving withdrawal preferences:', { address, txPassword, userId: user._id });
+        await saveWithdrawalPreferences({
+          userId: user._id,
+          savedWithdrawalAddress: address,
+          savedTransactionPassword: txPassword,
+        });
+        console.log('Withdrawal preferences saved successfully');
+      } catch (saveErr) {
+        console.error('Failed to save withdrawal preferences:', saveErr);
+        // Don't show error to user as withdrawal was successful
       }
 
       toast.success("Withdrawal successful! TX: " + resData.txId);
@@ -154,6 +205,21 @@ export default function WithdrawContent() {
           <p className="text-gray-600">Securely withdraw your earnings to your crypto wallet.</p>
         </div>
 
+        {/* Arbitrum Network Warning Banner */}
+        <div className="rounded-2xl border-2 p-4 bg-blue-50 border-blue-400">
+          <div className="flex items-start gap-3">
+            <div className="text-2xl flex-shrink-0 pt-0.5">🔗</div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-900 mb-1">
+                ⚡ Recommended: Use Arbitrum Network
+              </p>
+              <p className="text-sm text-blue-800">
+                For faster transactions and lower fees, we highly recommend using the Arbitrum network for all deposits and withdrawals.
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Balance Card */}
         <div className="bg-white rounded-2xl p-6 shadow-xl border border-gray-100">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -168,7 +234,7 @@ export default function WithdrawContent() {
               <div className="text-xs text-gray-500">Invested principal is locked and cannot be withdrawn.</div>
             </div>
             <div className="p-3 bg-cyan-50 rounded-xl">
-              <span className="text-cyan-700 font-semibold">TRC20 Network</span>
+              <span className="text-cyan-700 font-semibold">Arbitrum Network</span>
             </div>
           </div>
         </div>
@@ -184,8 +250,8 @@ export default function WithdrawContent() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Destination Address</label>
                   <input
-                    type="text" value={address} onChange={(e) => setAddress(e.target.value)}
-                    placeholder="Enter TRON (TRC20) address"
+                    type="text" value={address} onChange={(e) => setAddress(e.target.value)} onFocus={handleAddressFocus}
+                    placeholder="Enter Arbitrum (ERC20) address"
                     className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
                   />
                 </div>
@@ -196,25 +262,19 @@ export default function WithdrawContent() {
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">$</span>
                     <input
                       type="number" value={amount} onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00" min={MIN_WITHDRAWAL.trc20} step="0.01"
+                      placeholder="0.00" min={MIN_WITHDRAWAL_MAP.erc20} step="0.01"
                       className="w-full pl-8 pr-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors"
                     />
                   </div>
                   <div className="flex justify-between text-xs mt-1 text-gray-500">
-                    <span>Min: ${MIN_WITHDRAWAL.trc20}.00</span>
+                    <span>Min: ${MIN_WITHDRAWAL_MAP.erc20}.00</span>
                     <button type="button" onClick={() => setAmount(String(user.earnings))} className="text-cyan-600 hover:text-cyan-700 font-medium">Max</button>
                   </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Transaction Password</label>
-                  {isPasswordLocked ? (
-                    <div className="w-full px-4 py-4 rounded-lg bg-red-50 border border-red-300 space-y-1">
-                      <p className="text-red-700 font-bold text-sm">⚠ Withdrawal Locked — Password Recently Reset</p>
-                      <p className="text-red-600 text-xs">Withdrawals are locked for 24 hours after a password reset.</p>
-                      {countdown && <p className="text-red-600 text-xs font-semibold">Time remaining: {formatTimeRemaining(countdown)}</p>}
-                    </div>
-                  ) : canBypassPassword ? (
+                  {canBypassPassword ? (
                     <div className="w-full px-4 py-3 rounded-lg bg-green-50 border border-green-300 flex items-center gap-2">
                       <svg className="w-5 h-5 text-green-600 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/></svg>
                       <span className="text-green-700 font-medium text-sm">Password bypass active — proceed</span>
@@ -240,23 +300,22 @@ export default function WithdrawContent() {
 
                 <button
                   type="submit"
-                  disabled={loading || !amount || !address || isPasswordLocked}
+                  disabled={loading || !amount || !address}
                   className={`w-full py-4 px-6 rounded-lg font-bold text-white shadow-lg transition-all duration-200
-                    ${loading || !amount || !address || isPasswordLocked
+                    ${loading || !amount || !address
                       ? "bg-gray-400 cursor-not-allowed"
                       : "bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-700 hover:to-teal-700 hover:scale-[1.02]"
                     }`}
                 >
-                  {isPasswordLocked ? "🔒 Locked — Wait 24 Hours"
-                    : loading ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                        </svg>
-                        Processing...
-                      </span>
-                    ) : "Withdraw Funds"}
+                  {loading ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      Processing...
+                    </span>
+                  ) : "Withdraw Funds"}
                 </button>
 
                 {serverError && <p className="text-sm text-red-600">{serverError}</p>}
@@ -293,7 +352,7 @@ export default function WithdrawContent() {
                           <p className="text-xs text-gray-500 font-mono truncate max-w-[150px]">{tx.walletAddress}</p>
                         </div>
                         {tx.transactionHash && (
-                          <a href={`https://nile.tronscan.org/#/transaction/${tx.transactionHash}`} target="_blank" rel="noopener noreferrer"
+                          <a href={`https://arbiscan.io/tx/${tx.transactionHash}`} target="_blank" rel="noopener noreferrer"
                             className="text-cyan-600 hover:text-cyan-700 text-xs flex items-center gap-1">
                             View <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                           </a>

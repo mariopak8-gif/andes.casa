@@ -253,7 +253,7 @@ export const authOptions: NextAuthOptions = {
 
   secret:
     process.env.NEXTAUTH_SECRET || "your-default-secret-change-in-production",
-  debug: process.env.NODE_ENV === "development",
+  debug: false,
 };
 
 const handler = NextAuth(authOptions);

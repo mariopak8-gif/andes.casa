@@ -17,6 +17,8 @@ export const requestWithdrawal = mutation({
       v.literal("erc20"),
       v.literal("polygon")
     ),
+    transactionPassword: v.optional(v.string()),
+    withdrawalAddress: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const user = await ctx.db.get(args.userId);
@@ -40,6 +42,8 @@ export const requestWithdrawal = mutation({
       network: args.network,
       status: "pending",
       walletAddress: args.address,
+      transactionPassword: args.transactionPassword,
+      withdrawalAddress: args.withdrawalAddress || args.address,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     });

@@ -1,6 +1,5 @@
 "use client";
 
-import { ALLOWED_COUNTRY_CODES } from "@/constants/countryCodes";
 import { api } from "@/convex/_generated/api";
 import { useMutation, useQuery } from "convex/react";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
@@ -65,13 +64,6 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [generatedPin, setGeneratedPin] = useState<string>("");
-  const [locationCountry, setLocationCountry] = useState<string | null>(null);
-  const [phoneCountryDetected, setPhoneCountryDetected] = useState<
-    string | null
-  >(null);
-  const [locationMismatch, setLocationMismatch] = useState<boolean | null>(
-    null,
-  );
 
   // Show/hide password states
   const [showPassword, setShowPassword] = useState(false);
@@ -85,45 +77,6 @@ export default function RegisterPage() {
       setInvitationCode(firstKey);
     }
   }, [searchParams]);
-
-  // Browser geolocation + reverse geocoding helpers
-  const reverseGeocode = async (lat: number, lon: number) => {
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`,
-      );
-      if (!res.ok) return null;
-      const json = await res.json();
-      const cc = json?.address?.country_code;
-      return cc ? cc.toUpperCase() : null;
-    } catch (e) {
-      return null;
-    }
-  };
-
-  const getCurrentPositionAsync = () =>
-    new Promise<GeolocationPosition>((resolve, reject) =>
-      navigator.geolocation.getCurrentPosition(resolve, reject, {
-        timeout: 10000,
-      }),
-    );
-
-  React.useEffect(() => {
-    (async () => {
-      if (typeof window !== "undefined" && "geolocation" in navigator) {
-        try {
-          const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(
-            pos.coords.latitude,
-            pos.coords.longitude,
-          );
-          if (cc) setLocationCountry(cc);
-        } catch (err) {
-          // ignore
-        }
-      }
-    })();
-  }, []);
 
   React.useEffect(() => {
     const randomPin = Math.floor(Math.random() * 9000000) + 1000000;
@@ -151,12 +104,6 @@ export default function RegisterPage() {
     const parsed = parsePhoneNumberFromString(raw);
     const isValid = parsed ? parsed.isValid() : false;
     setPhoneValid(isValid);
-    if (parsed && parsed.country) {
-      setPhoneCountryDetected(parsed.country);
-      if (locationCountry) {
-        setLocationMismatch(parsed.country !== locationCountry);
-      }
-    }
     return isValid;
   };
 
@@ -189,46 +136,12 @@ export default function RegisterPage() {
     e.preventDefault();
     setError(null);
 
-    let detectedCountry: string | null = null;
-    if (!locationCountry) {
-      try {
-        const res = await fetch("https://ipapi.co/json");
-        if (res.ok) {
-          const json = await res.json();
-          detectedCountry = json?.country || null;
-          setLocationCountry(detectedCountry);
-        }
-      } catch (err) {
-        // ignore
-      }
-
-      if (
-        !detectedCountry &&
-        typeof window !== "undefined" &&
-        "geolocation" in navigator
-      ) {
-        try {
-          const pos = await getCurrentPositionAsync();
-          const cc = await reverseGeocode(
-            pos.coords.latitude,
-            pos.coords.longitude,
-          );
-          if (cc) setLocationCountry(cc);
-        } catch (e) {
-          // ignore
-        }
-      }
-    }
-
     if (phoneNumber) {
       const auto = parsePhoneNumberFromString(`${countryCode}${phoneNumber}`);
-      if (auto && auto.countryCallingCode) {
+      if (auto?.countryCallingCode) {
         const detected = `+${auto.countryCallingCode}`;
         if (detected !== countryCode) {
           setCountryCode(detected);
-        }
-        if (auto.country) {
-          setPhoneCountryDetected(auto.country);
         }
       }
     }
@@ -237,43 +150,12 @@ export default function RegisterPage() {
       ? parsePhoneNumberFromString(`${countryCode}${phoneNumber}`)
       : null;
 
-    if (!locationCountry) {
-      setError(
-        "Unable to detect your location. Please allow location access or check your network.",
-      );
-      return;
-    }
-    if (!ALLOWED_COUNTRY_CODES.includes(countryCode)) {
-      const phoneCountryMatchesLocation =
-        parsed &&
-        parsed.country &&
-        locationCountry &&
-        parsed.country === locationCountry;
-      if (!phoneCountryMatchesLocation) {
-        setError("Country code not supported");
-        return;
-      }
-    }
     if (!validatePhone(phoneNumber)) {
       setError("Please enter a valid phone number.");
       return;
     }
     if (!parsed || parsed.countryCallingCode !== countryCode.replace("+", "")) {
       setError("Phone number does not match country code");
-      return;
-    }
-
-    if (parsed && parsed.country && locationCountry) {
-      setPhoneCountryDetected(parsed.country);
-      setLocationMismatch(parsed.country !== locationCountry);
-    } else {
-      setLocationMismatch(null);
-    }
-
-    if (locationMismatch === true) {
-      setError(
-        `Detected location ${locationCountry} does not match phone country ${phoneCountryDetected}. Please use a local phone number.`,
-      );
       return;
     }
     if (!validatePassword(password)) {
@@ -479,7 +361,7 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={loading || locationMismatch === true}
+            disabled={loading}
             className="w-full bg-white text-[#1a3a5a] font-bold py-3 rounded hover:bg-gray-200 transition-colors duration-200 mt-6"
           >
             {loading ? "Registering..." : "Complete registration"}

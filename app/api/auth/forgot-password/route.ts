@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
 
     // Send email if user exists
     if (result.resetToken) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL;
       const resetLink = `${baseUrl}/reset-password?token=${result.resetToken}&email=${encodeURIComponent(email)}`;
 
       const emailSent = await sendEmail({

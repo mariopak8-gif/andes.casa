@@ -4,9 +4,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
-import { getAccountBalance, getNewTransactions } from '@/lib/tron/utils';
-import { sendTrx, sweepUsdtFromAddress } from '@/server/tronService';
-import { MIN_DEPOSIT } from '@/lib/tron/config';
+import { getAccountBalance, getNewTransactions } from '@/lib/arbitrum/utils';
+import { sendEth, sweepUsdtFromAddress } from '@/server/arbitrumService';
+import { MIN_DEPOSIT } from '@/lib/arbitrum/config';
 
 const convex      = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 const CRON_SECRET = process.env.CRON_SECRET || 'your-secret-key';
@@ -19,15 +19,15 @@ async function fundAndSweep(
   depositAddress:    string,
   hotWalletAddress:  string,
   depositPrivateKey: string,
-  trxBalance:        number,
+  ethBalance:        number,
   usdtBalance:       number
 ): Promise<{ txId: string; amount: number } | null> {
   if (usdtBalance < MIN_SWEEP) return null;
 
-  if (trxBalance < 5) {
-    console.log(`  ⚡ [SWEEP] Low TRX (${trxBalance}). Funding 5 TRX...`);
+  if (ethBalance < 0.001) {
+    console.log(`  ⚡ [SWEEP] Low ETH (${ethBalance}). Funding 0.001 ETH...`);
     try {
-      const fundTx = await sendTrx(depositAddress, 5);
+      const fundTx = await sendEth(depositAddress, 0.001);
       console.log(`  ✅ [SWEEP] Gas funded: ${fundTx}`);
       await new Promise((r) => setTimeout(r, SWEEP_DELAY));
     } catch (e: any) {
@@ -130,7 +130,7 @@ export async function POST(req: NextRequest) {
           getNewTransactions(depositAddress, lastCheck),
         ]);
 
-        console.log(`  💰 Balance: TRX ${balance.trx} | USDT ${balance.usdt}`);
+        console.log(`  💰 Balance: ETH ${balance.eth} | USDT ${balance.usdt}`);
         console.log(`  📊 New txs: ${newTransactions.length}`);
 
         totalFound += newTransactions.length;
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
           if (hotWalletAddress && tx?.from === hotWalletAddress) { console.log(`  ⏭️  Own funding tx`); continue; }
 
           const amount = Number(tx?.amount);
-          const minDeposit = tx?.type === 'TRX' ? MIN_DEPOSIT.TRX : MIN_DEPOSIT.USDT;
+          const minDeposit = MIN_DEPOSIT.USDT;
 
           if (amount < minDeposit) {
             console.log(`  ⚠️  Too small: ${amount} ${tx?.type} (min ${minDeposit})`);
@@ -153,12 +153,12 @@ export async function POST(req: NextRequest) {
           let recordedAmount = amount;
 
           // Auto-sweep USDT to hot wallet
-          if (tx?.type === 'TRC20' && canSweep && hotWalletAddress && depositPrivateKey) {
+          if (tx?.type === 'usdt-transfer' && canSweep && hotWalletAddress && depositPrivateKey) {
             const sweep = await fundAndSweep(
               depositAddress,
               hotWalletAddress,
               depositPrivateKey,
-              balance.trx,
+              balance.eth,
               balance.usdt
             );
             if (sweep) {
@@ -203,7 +203,7 @@ export async function POST(req: NextRequest) {
             depositAddress,
             hotWalletAddress,
             depositPrivateKey,
-            balance.trx,
+            balance.eth,
             balance.usdt
           );
 
@@ -230,12 +230,26 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Advance lastCheck ────────────────────────────────────────────
-        const newTimestamp = Math.max(latestTimestamp, pollStarted);
-        await convex.mutation(api.deposit.updateLastDepositCheck, {
-          userId:    user._id,
-          timestamp: newTimestamp,
-        });
-        console.log(`  🕐 lastCheck → ${new Date(newTimestamp).toISOString()}`);
+        // ✅ ONLY advance if deposits were found (totalProcessed > 0 for this user in this loop)
+        // Otherwise keep the old timestamp so future deposits aren't blocked
+        let depositsFoundThisUser = false;
+        for (const result of results) {
+          if (result.user === user.contact && result.status?.includes('processed')) {
+            depositsFoundThisUser = true;
+            break;
+          }
+        }
+        
+        if (depositsFoundThisUser) {
+          const newTimestamp = Math.max(latestTimestamp, pollStarted);
+          await convex.mutation(api.deposit.updateLastDepositCheck, {
+            userId:    user._id,
+            timestamp: newTimestamp,
+          });
+          console.log(`  🕐 lastCheck → ${new Date(newTimestamp).toISOString()}`);
+        } else {
+          console.log(`  🕐 lastCheck unchanged (no deposits found this check)`);
+        }
 
       } catch (e: any) {
         console.error(`❌ Error for ${user.contact}: ${e?.message}`);

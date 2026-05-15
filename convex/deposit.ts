@@ -13,6 +13,7 @@ export const setDepositAddress = mutation({
   args: {
     userId: v.id("user"),
     network: v.union(
+      v.literal("arbitrum"),
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),
@@ -54,6 +55,7 @@ export const saveDepositAddress = mutation({
   args: {
     userId: v.id("user"),
     network: v.union(
+      v.literal("arbitrum"),
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),
@@ -95,6 +97,7 @@ export const getDepositPrivateKey = query({
   args: {
     userId: v.id("user"),
     network: v.union(
+      v.literal("arbitrum"),
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),
@@ -117,6 +120,7 @@ export const recordDeposit = mutation({
   args: {
     userId: v.id("user"),
     network: v.union(
+      v.literal("arbitrum"),
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),

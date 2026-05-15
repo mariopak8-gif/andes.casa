@@ -1,23 +1,29 @@
 import { NextResponse } from 'next/server';
-import { getTronWeb, getAccountBalance } from '@/lib/tron/utils';
-import { ACTIVE_USDT_CONTRACT } from '@/lib/tron/config';
+import { getProvider, getAccountBalance } from '@/lib/arbitrum/utils';
+import { ACTIVE_NETWORK, ACTIVE_USDT_CONTRACT } from '@/lib/arbitrum/config';
 
 export async function GET() {
   try {
-    const tronWeb = getTronWeb();
-    const privateKey = process.env.TRON_PRIVATE_KEY;
+    const provider = await getProvider();
+    const privateKey = process.env.MAIN_WALLET_PRIVATE_KEY;
 
     if (!privateKey) {
-      return NextResponse.json({ error: 'Missing TRON_PRIVATE_KEY' }, { status: 500 });
+      return NextResponse.json({ error: 'Missing MAIN_WALLET_PRIVATE_KEY' }, { status: 500 });
     }
 
-    // Derive hot wallet address
-    const hotAddress = tronWeb.address.fromPrivateKey(privateKey);
+    // Derive hot wallet address from ethers
+    const { address: hotAddress } = (await getAccountBalance('0x0000000000000000000000000000000000000000').catch(() => ({ address: '' })));
+    if (!hotAddress) {
+      return NextResponse.json({ error: 'Could not derive hot wallet address' }, { status: 500 });
+    }
     console.log('Hot wallet address:', hotAddress);
 
-    // Get account details
-    const response = await fetch(`https://nile.trongrid.io/v1/accounts/${hotAddress}`, {
-      headers: { 'TRON-PRO-API-KEY': process.env.TRONGRID_API_KEY || '' },
+    // Get account details via provider
+    const rpcUrl = ACTIVE_NETWORK.rpcUrl;
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
     });
 
     const accountData = await response.json();
@@ -33,7 +39,7 @@ export async function GET() {
     return NextResponse.json({
       hotWallet: {
         address: hotAddress,
-        trxBalance: bal.trx,
+        ethBalance: bal.eth,
         usdt_balance_for_configured_contract: bal.usdt,
       },
       configured: {

@@ -1,15 +1,23 @@
-// app/api/deposit/address/route.ts
+// app/api/arbitrum/deposit/address/route.ts
+// ✅ ARBITRUM ONLY — Returns or generates Arbitrum deposit address
+
 import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/auth';
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '@/convex/_generated/api';
-import { generateTronAddress, getAccountBalance } from '@/lib/tron/utils';
+import { generateArbitrumAddress, getAccountBalance } from '@/lib/arbitrum/utils';
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+function getConvexClient() {
+  const url = process.env.NEXT_PUBLIC_CONVEX_URL?.trim();
+  if (!url) {
+    throw new Error('Missing NEXT_PUBLIC_CONVEX_URL environment variable');
+  }
+  return new ConvexHttpClient(url);
+}
 
 /**
- * GET — Returns (or generates) a unique TRC20 deposit address for the logged-in user.
+ * GET — Returns (or generates) a unique Arbitrum deposit address for the logged-in user.
  *
  * Each user gets their own address. Funds sent there are swept to the hot wallet
  * automatically when they click "Check for New Deposits", and the user is credited.
@@ -22,6 +30,7 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const convex = getConvexClient();
     const user = await convex.query(api.user.getUserByContact, {
       contact: session.user.contact,
     });
@@ -31,7 +40,7 @@ export async function GET(req: Request) {
     }
 
     // ── Return existing address if already generated ──────────────────────
-    let depositAddress = user.depositAddresses?.trc20;
+    let depositAddress = user.depositAddresses?.arbitrum;
 
     if (depositAddress) {
       console.log(`[DEPOSIT ADDRESS] Returning existing address for ${session.user.contact}: ${depositAddress}`);
@@ -39,13 +48,13 @@ export async function GET(req: Request) {
       // ── Generate a fresh unique address for this user ──────────────────
       console.log(`[DEPOSIT ADDRESS] Generating new address for ${session.user.contact}...`);
 
-      const { address, privateKey } = await generateTronAddress();
+      const { address, privateKey } = await generateArbitrumAddress();
 
       // Save both address AND private key to Convex
       // The private key is stored server-side and never returned to the client
       await convex.mutation(api.deposit.setDepositAddress, {
         userId:     user._id,
-        network:    'trc20',
+        network:    'arbitrum',
         address:    address,
         privateKey: privateKey,
       });
@@ -55,7 +64,7 @@ export async function GET(req: Request) {
     }
 
     // ── Get current balance on the deposit address ────────────────────────
-    let balance = { trx: 0, usdt: 0 };
+    let balance = { eth: 0, usdt: 0 };
     try {
       balance = await getAccountBalance(depositAddress);
     } catch (e: any) {
@@ -65,18 +74,18 @@ export async function GET(req: Request) {
     return NextResponse.json({
       success:        true,
       depositAddress,
-      depositNetwork: 'trc20',
-      network:        'TRON (TRC20)',
+      depositNetwork: 'arbitrum',
+      network:        'Arbitrum (L2)',
       minDeposit:     20,
       userBalance:    (user.depositAmount ?? 0) + (user.earnings ?? 0),
       addressBalance: {
-        trx:  balance.trx,
+        eth:  balance.eth,
         usdt: balance.usdt,
       },
       instructions: [
-        `Send USDT (TRC20) to: ${depositAddress}`,
+        `Send USDT to: ${depositAddress}`,
         'Minimum deposit: 20 USDT',
-        'Network: TRON (TRC20) — do NOT send from other networks',
+        'Network: Arbitrum One (L2) — do NOT send from other networks',
         'Click "Check for New Deposits" after sending to credit your account',
       ],
     });

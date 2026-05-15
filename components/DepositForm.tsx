@@ -179,7 +179,7 @@ export default function DepositForm() {
                 </div>
                 <div>
                   <p className="text-gray-600">Minimum Deposit</p>
-                  <p className="font-semibold text-gray-900">10 USDT</p>
+                  <p className="font-semibold text-gray-900">20 USDT</p>
                 </div>
               </div>
             </div>

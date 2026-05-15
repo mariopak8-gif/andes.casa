@@ -327,11 +327,31 @@ export const instantClaimTask = mutation({
     const user = await ctx.db.get(args.userId);
     if (!user) return { success: false, error: "User not found" };
 
-    // Check 24-hour cooldown after last task claim
+    // Get renewal time from settings
+    const renewalSettings = await ctx.db
+      .query("settings")
+      .withIndex("by_key", (q: any) => q.eq("key", "taskRenewalTime"))
+      .first();
+    const renewalHour = renewalSettings?.value?.hour ?? 19;
+    const renewalMinute = renewalSettings?.value?.minute ?? 0;
+    const timeZone = renewalSettings?.value?.timeZone ?? 'local';
+
     const now = Date.now();
-    const cooldownMs = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-    if (user.lastTaskClaimTime && (now - user.lastTaskClaimTime) < cooldownMs) {
-      const remainingMs = cooldownMs - (now - user.lastTaskClaimTime);
+    const todayRenewal = new Date();
+    todayRenewal.setHours(renewalHour, renewalMinute, 0, 0);
+    if (timeZone !== 'local') {
+      // For simplicity, assume local for now; can add timezone logic later
+    }
+    if (now < todayRenewal.getTime()) {
+      // If before today's renewal, check yesterday's renewal
+      todayRenewal.setDate(todayRenewal.getDate() - 1);
+    }
+    const lastAllowedClaim = todayRenewal.getTime();
+
+    if (user.lastTaskClaimTimes?.[args.grade] && user.lastTaskClaimTimes[args.grade] >= lastAllowedClaim) {
+      const nextRenewal = new Date(todayRenewal);
+      nextRenewal.setDate(nextRenewal.getDate() + 1);
+      const remainingMs = nextRenewal.getTime() - now;
       const remainingHours = Math.ceil(remainingMs / (60 * 60 * 1000));
       return { success: false, error: `You must wait ${remainingHours} hours before claiming another task reward.` };
     }
@@ -355,8 +375,10 @@ export const instantClaimTask = mutation({
     }
 
     // Update last task claim time
+    const updatedClaimTimes = { ...user.lastTaskClaimTimes };
+    updatedClaimTimes[args.grade] = now;
     await ctx.db.patch(args.userId, {
-      lastTaskClaimTime: now,
+      lastTaskClaimTimes: updatedClaimTimes,
     });
 
     return {

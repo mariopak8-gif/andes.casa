@@ -69,39 +69,48 @@ async function sendViaResend(options: EmailOptions): Promise<boolean> {
 
 /**
  * Send email via SMTP (Gmail, Outlook, custom SMTP)
+ * Uses Nodemailer for direct SMTP connection
  */
 async function sendViaSMTP(options: EmailOptions): Promise<boolean> {
   try {
-    // Use Nodemailer-like logic through Node.js built-in modules
-    // For production, install nodemailer: npm install nodemailer
+    const nodemailer = require('nodemailer');
     
-    // Construct SMTP URL for debugging
     const smtpHost = process.env.SMTP_HOST;
-    const smtpPort = process.env.SMTP_PORT;
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
     const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    const senderEmail = process.env.SENDER_EMAIL || 'noreply@andes.com';
 
-    // Try to send via API endpoint if available
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send-email-smtp`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        to: options.to,
-        subject: options.subject,
-        html: options.html,
-      }),
-    });
-
-    if (response.ok) {
-      console.log(`[EMAIL SERVICE - SMTP] Email sent to ${options.to}`);
-      return true;
-    } else {
-      console.error('[EMAIL SERVICE - SMTP] Error:', await response.text());
+    if (!smtpHost || !smtpUser || !smtpPass) {
+      console.error(
+        '[EMAIL SERVICE - SMTP] Missing credentials: SMTP_HOST, SMTP_USER, or SMTP_PASS not configured'
+      );
       return false;
     }
-  } catch (error) {
-    console.error('[EMAIL SERVICE - SMTP] Error:', error);
+
+    const secure = smtpPort === 465; // Use TLS/SSL for port 465
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: secure,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
+    });
+
+    const info = await transporter.sendMail({
+      from: senderEmail,
+      to: options.to,
+      subject: options.subject,
+      html: options.html,
+    });
+
+    console.log(`[EMAIL SERVICE - SMTP] Email sent to ${options.to} - Message ID: ${info.messageId}`);
+    return true;
+  } catch (error: any) {
+    console.error('[EMAIL SERVICE - SMTP] Error:', error?.message || error);
     return false;
   }
 }

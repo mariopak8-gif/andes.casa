@@ -41,7 +41,7 @@ const amount = Number(args.amount) || 0;
 const address = String(args.address || '');
 const network = String(args.network || 'trc20');
 
-const MIN_WITHDRAWAL = { polygon: 2, erc20: 20, trc20: 100, bep20: 2 };
+const MIN_WITHDRAWAL = { polygon: 2, erc20: 2, trc20: 2, bep20: 2 };
 
 console.log('\n--- DRY RUN: Withdrawal Simulation ---');
 console.log(`User: ${userId}`);

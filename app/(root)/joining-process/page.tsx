@@ -8,6 +8,7 @@ import { useQuery } from 'convex/react';
 import { api } from '@/convex/_generated/api';
 import { useRouter } from 'next/navigation';
 import Footer from '@/components/Footer';
+import { MIN_WITHDRAWAL } from '@/constants';
 
 const grades = [
   { grade: 'A1', equipment: 20, daily: 2, monthly: 60, annual: 730 },
@@ -343,7 +344,7 @@ export default function JoiningProcessPage() {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Min Deposit', value: '20 USDT' },
-                  { label: 'Min Withdrawal', value: '5 USDT' },
+                  { label: 'Min Withdrawal', value: `${MIN_WITHDRAWAL} USDT` },
                   { label: 'Daily Update', value: '10:00 AM NY' },
                   { label: 'Withdrawals', value: '1–5 mins' },
                 ].map(({ label, value }) => (

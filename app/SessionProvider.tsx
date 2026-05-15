@@ -14,7 +14,7 @@ function SessionLoadingFallback() {
 export default function NextAuthSessionProvider({ children }: { children: ReactNode }) {
   return (
     <Suspense fallback={<SessionLoadingFallback />}>
-      <SessionProvider 
+      <SessionProvider
         basePath="/api/auth"
         refetchInterval={5 * 60}
         refetchOnWindowFocus={true}

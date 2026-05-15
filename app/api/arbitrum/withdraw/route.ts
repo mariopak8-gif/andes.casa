@@ -3,9 +3,23 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/auth";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { ACTIVE_USDT_CONTRACT } from "@/lib/tron/config";import { getAccountBalance, getTronWeb } from '@/lib/tron/utils';import { WITHDRAW_FEES } from "@/constants";
+import {
+  getProvider,
+  getAccountBalance,
+  transferUsdt,
+  type AccountBalance,
+} from "@/lib/arbitrum/utils";
+import { ACTIVE_USDT_CONTRACT } from "@/lib/arbitrum/config";
+import { waitForConfirmation } from "../../../../server/arbitrumService";
+import { WITHDRAW_FEES, MIN_WITHDRAWAL } from "@/constants";
 
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || process.env.CONVEX_URL;
+if (!convexUrl) {
+  throw new Error(
+    "Missing Convex URL: set NEXT_PUBLIC_CONVEX_URL or CONVEX_URL in your environment",
+  );
+}
+const convex = new ConvexHttpClient(convexUrl);
 
 // Simple custom hash function (matches convex/user.ts)
 function simpleHash(input: string): string {
@@ -23,12 +37,11 @@ function sleep(ms: number) {
   return new Promise((res) => setTimeout(res, ms));
 }
 
-// Helper to validate TRON address format
-function isValidTronAddress(address: string) {
+// Helper to validate Arbitrum address format
+function isValidArbitrumAddress(address: string) {
   try {
-    const TronWeb = require('tronweb');
-    const tronWeb = new TronWeb();
-    return tronWeb.isAddress(address);
+    const { ethers } = require('ethers');
+    return ethers.isAddress(address);
   } catch {
     return false;
   }
@@ -44,41 +57,81 @@ export async function POST(req: Request) {
 
     const body = await req.json();
     const { amount, network, address, transactionPassword } = body;
+    const amountFloat = parseFloat(String(amount ?? ""));
 
-    if (!amount || !network || !address) {
+    if (!amount || !network || !address || Number.isNaN(amountFloat)) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing or invalid required fields" },
         { status: 400 },
       );
     }
 
-    if (network !== "trc20") {
+    if (amountFloat < MIN_WITHDRAWAL) {
       return NextResponse.json(
-        { error: "Only TRC20 withdrawals are currently supported" },
+        { error: `Minimum withdrawal is ${MIN_WITHDRAWAL} USDT` },
+        { status: 400 },
+      );
+    }
+
+    if (amountFloat <= WITHDRAW_FEES) {
+      return NextResponse.json(
+        { error: `Amount must be greater than withdrawal fees (${WITHDRAW_FEES} USDT)` },
+        { status: 400 },
+      );
+    }
+
+    if (network !== "erc20") {
+      return NextResponse.json(
+        { error: "Only ERC20 withdrawals are currently supported" },
         { status: 400 },
       );
     }
 
     // Validate destination address format
-    if (!isValidTronAddress(address)) {
+    if (!isValidArbitrumAddress(address)) {
       return NextResponse.json(
-        { error: "Invalid TRON address" },
+        { error: "Invalid Arbitrum address" },
         { status: 400 },
       );
     }
 
+    // Check if destination address is a contract (contracts can't receive ETH for gas)
+    try {
+      const provider = await getProvider();
+      const code = await provider.getCode(address);
+      if (code !== '0x') {
+        return NextResponse.json(
+          { error: "Cannot withdraw to contract addresses" },
+          { status: 400 },
+        );
+      }
+    } catch (contractCheckErr: any) {
+      console.warn(`Could not verify if address is contract: ${contractCheckErr?.message}`);
+      // Continue anyway - better to let the transaction proceed and fail later than block valid withdrawals
+    }
+
     // 1. Get User ID from Convex
-    const user = await convex.query(api.user.getUserByContact, {
-      contact: session.user.contact,
-    });
+    let user;
+    try {
+      user = await convex.query(api.user.getUserByContact, {
+        contact: session.user.contact,
+      });
+    } catch (convexErr: any) {
+      console.error('Convex query failed:', convexErr);
+      return NextResponse.json(
+        {
+          error:
+            'Server configuration error: unable to reach Convex. Check NEXT_PUBLIC_CONVEX_URL / CONVEX_URL and network connectivity.',
+        },
+        { status: 500 },
+      );
+    }
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const amountFloat = parseFloat(amount);
     const withdrawAmount = amountFloat - WITHDRAW_FEES;
-    // Get transaction password from request (can be empty for 24hr bypass)
 
 
     // Check if user can bypass password verification (24 hours since forgotten)
@@ -140,7 +193,7 @@ export async function POST(req: Request) {
     }
 
     // Validate server configuration and hot-wallet balances BEFORE creating a pending withdrawal
-    const privateKey = process.env.TRON_PRIVATE_KEY;
+    const privateKey = process.env.MAIN_WALLET_PRIVATE_KEY;
     if (!privateKey) {
       return NextResponse.json(
         { error: "Server configuration error: Missing hot wallet key" },
@@ -155,31 +208,22 @@ export async function POST(req: Request) {
       );
     }
 
-    // Build tronWeb and derive hot wallet address
-    const tronWeb = getTronWeb();
-    let hotAddress: string | null = null;
-    try {
-      hotAddress = tronWeb.address.fromPrivateKey(privateKey);
-    } catch (err) {
-      console.error(
-        "Failed to derive hot wallet address from private key:",
-        err,
-      );
-      return NextResponse.json(
-        { error: "Server configuration error: Invalid hot wallet key" },
-        { status: 500 },
-      );
-    }
+    // Derive hot wallet address from private key
+    const { ethers } = require('ethers');
+    const provider = await getProvider();
+    const wallet = new ethers.Wallet(privateKey, provider);
+    const hotAddress = wallet.address;
 
     // Check hot wallet balances
+    let initialHotWalletBalance: AccountBalance;
     try {
-      const bal = await getAccountBalance(hotAddress!);
+      initialHotWalletBalance = await getAccountBalance(hotAddress);
 
-      console.log(`Hot wallet balances - TRX: ${bal.trx}, USDT: ${bal.usdt}`);
+      console.log(`Hot wallet balances - ETH: ${initialHotWalletBalance.eth}, USDT: ${initialHotWalletBalance.usdt}`);
 
-      if ((bal.usdt || 0) < amountFloat) {
+      if ((initialHotWalletBalance.usdt || 0) < amountFloat) {
         console.error(
-          `Hot wallet insufficient USDT: has ${bal.usdt}, needs ${amountFloat}`,
+          `Hot wallet insufficient USDT: has ${initialHotWalletBalance.usdt}, needs ${amountFloat}`,
         );
         return NextResponse.json(
           {
@@ -190,9 +234,9 @@ export async function POST(req: Request) {
           { status: 503 },
         );
       }
-      // Ensure there's some TRX for fees (require at least 0.001 TRX for safety)
-      if ((bal.trx || 0) < 0.001) {
-        console.error(`Hot wallet insufficient TRX for fees: ${bal.trx}`);
+      // Ensure there's some ETH for fees (require at least 0.001 ETH for safety)
+      if ((initialHotWalletBalance.eth || 0) < 0.001) {
+        console.error(`Hot wallet insufficient ETH for fees: ${initialHotWalletBalance.eth}`);
         return NextResponse.json(
           {
             error:
@@ -218,7 +262,7 @@ export async function POST(req: Request) {
         userId: user._id,
         amount: amountFloat, // Deduct FULL amount from user balance
         address: address, // user's destination address
-        network: "trc20",
+        network: "erc20",
         transactionPassword: transactionPassword, // Save transaction password for audit
         withdrawalAddress: address, // Save withdrawal address for audit
       });
@@ -229,128 +273,99 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. Process withdrawal on Tron Blockchain (with retries and improved logging)
+    // 3. Process withdrawal on Arbitrum Blockchain (with retries and improved logging)
     try {
-      const tronWeb = getTronWeb();
-      const privateKey = process.env.TRON_PRIVATE_KEY;
-
-      if (!privateKey) {
-        throw new Error("Server configuration error: Missing hot wallet key");
-      }
-
-      tronWeb.setPrivateKey(privateKey);
-
-      const contract = await tronWeb.contract().at(ACTIVE_USDT_CONTRACT);
-
-      // Amount is in USDT (6 decimals) - convert to integer units
-      const amountInSun = Math.floor(withdrawAmount* 1_000_000);
-
       console.log(`Processing withdrawal: ${withdrawAmount} USDT to ${address}`);
       console.log(`Contract: ${ACTIVE_USDT_CONTRACT}`);
 
-      // TRON doesn't need ETH funding - proceed directly to USDT transfer
+      // ⭐ ADDRESS CHECK: Verify destination address is valid on Arbitrum
+      try {
+        const provider = await getProvider();
+        const code = await provider.getCode(address);
+        const isContract = code !== '0x';
+
+        if (isContract) {
+          console.log(`⚠️ Destination address ${address} is a contract`);
+        } else {
+          console.log(`Destination address is an externally owned account`);
+        }
+      } catch (balanceCheckErr: any) {
+        console.error(
+          `⚠️ Failed to verify destination address type: ${balanceCheckErr?.message || balanceCheckErr}`,
+        );
+      }
 
       // Helper to attempt the transfer with retries
       const maxRetries = 3;
       let lastError: any = null;
-      let tradeResult: any = null;
+      let txHash: string | null = null;
 
       for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
           console.log(`\n🔄 Transfer attempt ${attempt + 1}/${maxRetries}`);
           console.log(`   From: ${hotAddress}`);
           console.log(`   To: ${address}`);
-          console.log(`   Amount (sun): ${amountInSun}`);
+          console.log(`   Amount: ${withdrawAmount} USDT`);
 
-          // Send USDT from hot wallet to the user's destination `address`.
-          const transferMethod = contract.transfer(address, amountInSun);
-          console.log(`   Transfer method created`);
+          // Send USDT from hot wallet to the user's destination address
+          const transferResult = await transferUsdt(privateKey, address, withdrawAmount);
 
-          tradeResult = await transferMethod.send({ feeLimit: 100_000_000 });
-
-          console.log(
-            `   Raw result:`,
-            typeof tradeResult,
-            Object.keys(tradeResult || {}).slice(0, 10),
-          );
-
-          // tronWeb may return a tx id string or an object; normalize
-          const txId =
-            typeof tradeResult === "string"
-              ? tradeResult
-              : tradeResult &&
-                (tradeResult.hash ||
-                  tradeResult.transaction?.hash ||
-                  tradeResult.txid ||
-                  tradeResult.result?.hash);
-
-          console.log(`   TxId extracted:`, txId?.substring(0, 16));
-
-          if (txId) {
-            console.log(`Transfer succeeded on attempt ${attempt + 1}:`, txId);
+          if (transferResult.success && transferResult.transactionId) {
+            txHash = transferResult.transactionId;
+            console.log(`Transfer succeeded on attempt ${attempt + 1}:`, txHash);
 
             // ⭐ CRITICAL: Verify txHash exists on blockchain before confirming
             let txVerified = false;
-            const maxVerifyAttempts = 12;
+            const maxVerifyAttempts = 30; // More attempts for Arbitrum
             for (
               let verifyAttempt = 0;
               verifyAttempt < maxVerifyAttempts;
               verifyAttempt++
             ) {
-              await sleep(1000 * (verifyAttempt < 3 ? 1 : 2)); // 1s for first 3, then 2s
+              await sleep(2000); // 2 second intervals for Arbitrum
               try {
-                const verifyRes = await fetch(
-                  `${process.env.TRONGRID_API_URL || "https://nile.trongrid.io"}/v1/transactions/${txId}`,
-                  {
-                    headers: {
-                      "TRON-PRO-API-KEY": process.env.TRONGRID_API_KEY || "",
-                    },
-                  },
-                );
-                if (verifyRes.ok) {
-                  const txData = await verifyRes.json();
-                  if (txData.data?.[0]) {
-                    txVerified = true;
-                    console.log(
-                      `✅ TxHash verified on blockchain after ${verifyAttempt + 1} attempts: ${txId}`,
-                    );
-                    break;
-                  }
+                const provider = await getProvider();
+                const receipt = await waitForConfirmation(provider, txHash);
+                if (receipt && receipt.status === 1) {
+                  txVerified = true;
+                  console.log(
+                    `✅ TxHash verified on blockchain after ${verifyAttempt + 1} attempts: ${txHash}`,
+                  );
+                  break;
                 }
               } catch (verifyErr) {
                 console.log(
-                  `Verification attempt ${verifyAttempt + 1}/${maxVerifyAttempts} for ${txId}: Network/API error, retrying...`,
+                  `Verification attempt ${verifyAttempt + 1}/${maxVerifyAttempts} for ${txHash}: Network/API error, retrying...`,
                 );
               }
             }
 
             if (!txVerified) {
               console.warn(
-                `⚠️ TxHash ${txId} not found on blockchain after ${maxVerifyAttempts} attempts (${maxVerifyAttempts * 1.5}s timeout).`,
+                `⚠️ TxHash ${txHash} not confirmed on blockchain after ${maxVerifyAttempts} attempts (${maxVerifyAttempts * 2}s timeout).`,
               );
               console.warn(
-                `   Network may be congested or tx failed silently. Checking hot wallet balance as fallback...`,
+                `   Network may be congested or tx failed. Checking hot wallet balance as fallback...`,
               );
 
-              // FALLBACK: Check if funds actually arrived at hot wallet
+              // FALLBACK: Check if funds actually left the hot wallet
               try {
-                await sleep(2000);
-                const hotWalletBal = await getAccountBalance(hotAddress!);
-                
+                await sleep(5000);
+                const hotWalletBal = await getAccountBalance(hotAddress);
 
                 console.log(
-                  `📊 Hot wallet balance check: Expected increase of ${withdrawAmount} USDT, Current USDT: ${hotWalletBal.usdt} USDT`,
+                  `📊 Hot wallet balance check: Expected decrease of ${withdrawAmount} USDT, Current USDT: ${hotWalletBal.usdt} USDT`,
                 );
 
-                // Only consider it successful if we have a significant match (within 1%)
-                if ((hotWalletBal.usdt || 0) >= withdrawAmount * 0.99) {
+                // Only consider it successful if we have a significant decrease
+                if ((hotWalletBal.usdt || 0) <= (initialHotWalletBalance.usdt || 0) - withdrawAmount * 0.99) {
                   console.log(
-                    `✅ FALLBACK VERIFIED: Funds arrived at hot wallet. Balance: ${hotWalletBal.usdt} USDT`,
+                    `✅ FALLBACK VERIFIED: Funds left hot wallet. Balance: ${hotWalletBal.usdt} USDT`,
                   );
                   txVerified = true;
                 } else {
                   console.error(
-                    `❌ FALLBACK FAILED: Hot wallet balance (${hotWalletBal.usdt}) verification inconclusive. Expected at least ${withdrawAmount * 0.99} USDT`,
+                    `❌ FALLBACK FAILED: Hot wallet balance (${hotWalletBal.usdt}) verification inconclusive. Expected at most ${(initialHotWalletBalance.usdt || 0) - withdrawAmount * 0.99} USDT`,
                   );
                 }
               } catch (fallbackErr) {
@@ -361,10 +376,10 @@ export async function POST(req: Request) {
 
             if (!txVerified) {
               console.error(
-                `❌ CRITICAL: TxHash ${txId} not confirmed and fallback check failed. Marking as failed to refund.`,
+                `❌ CRITICAL: TxHash ${txHash} not confirmed and fallback check failed. Marking as failed to refund.`,
               );
               lastError = new Error(
-                `Transaction not confirmed on blockchain within timeout (12 attempts, fallback failed)`,
+                `Transaction not confirmed on blockchain within timeout (30 attempts, fallback failed)`,
               );
               continue;
             }
@@ -373,19 +388,24 @@ export async function POST(req: Request) {
             await convex.mutation(api.withdrawal.completeWithdrawal, {
               transactionId,
               status: "completed",
-              transactionHash: String(txId),
+              transactionHash: txHash,
             });
 
             return NextResponse.json({
               success: true,
-              txId: String(txId),
+              txId: txHash,
               message: "Withdrawal successful",
             });
+          } else {
+            // Transfer failed
+            console.error(`Transfer failed on attempt ${attempt + 1}:`, transferResult.error);
+            lastError = new Error(transferResult.error || 'Transfer failed');
+            continue;
           }
 
-          // If no txId, treat as error
+          // If no txHash, treat as error
           lastError = new Error(
-            "No transaction id returned from Tron transfer",
+            "No transaction hash returned from Arbitrum transfer",
           );
         } catch (err: any) {
           lastError = err;
@@ -404,7 +424,7 @@ export async function POST(req: Request) {
 
           // Backoff before retrying
           if (attempt < maxRetries - 1) {
-            await sleep(500 * Math.pow(2, attempt));
+            await sleep(1000 * Math.pow(2, attempt));
           }
         }
       }

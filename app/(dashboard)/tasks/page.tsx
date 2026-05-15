@@ -23,8 +23,10 @@ export default function TasksPage() {
   const [showRenewalConfig, setShowRenewalConfig] = useState(false);
 
   const user = useQuery(api.user.getUserByContact, { contact: session?.user?.contact || '' });
+  const renewalSettings = useQuery(api.settings.getSettingByKey, { key: 'taskRenewalTime' });
+  const setSettingsMutation = useMutation(api.settings.setSettings);
 
-  // Load renewal time from localStorage
+  // Load renewal time from localStorage and backend
   useEffect(() => {
     try {
       const stored = localStorage.getItem('andes_task_renewal_time');
@@ -33,13 +35,19 @@ export default function TasksPage() {
         if (hour !== undefined) setRenewalHour(hour);
         if (minute !== undefined) setRenewalMinute(minute);
         setRenewalTimeZone(timeZone || 'local');
+      } else if (renewalSettings?.value) {
+        // Fallback to backend settings if no localStorage
+        const { hour, minute, timeZone } = renewalSettings.value;
+        setRenewalHour(hour || 19);
+        setRenewalMinute(minute || 0);
+        setRenewalTimeZone(timeZone || 'local');
       }
     } catch (e) {
       console.error('Error loading renewal time:', e);
     }
-  }, []);
+  }, [renewalSettings]);
 
-  const saveRenewalTime = () => {
+  const saveRenewalTime = async () => {
     if (user?.role !== 'admin') {
       toastError('Only admins can configure renewal time.');
       return;
@@ -54,6 +62,7 @@ export default function TasksPage() {
     setRenewalTimeZone(cfg.timeZone);
     try {
       localStorage.setItem('andes_task_renewal_time', JSON.stringify(cfg));
+      await setSettingsMutation({ key: 'taskRenewalTime', value: cfg });
       toastSuccess('Renewal time updated successfully.');
     } catch (e) {
       toastError('Failed to save renewal time.');
@@ -61,12 +70,13 @@ export default function TasksPage() {
     }
   };
 
-  const resetRenewalTime = () => {
+  const resetRenewalTime = async () => {
     setRenewalHour(19);
     setRenewalMinute(0);
     setRenewalTimeZone('local');
     try {
       localStorage.setItem('andes_task_renewal_time', JSON.stringify({ hour: 19, minute: 0, timeZone: 'local' }));
+      await setSettingsMutation({ key: 'taskRenewalTime', value: { hour: 19, minute: 0, timeZone: 'local' } });
       toastSuccess('Renewal time reset to default (19:00 Local).');
     } catch (e) {
       console.error('Error resetting renewal time', e);

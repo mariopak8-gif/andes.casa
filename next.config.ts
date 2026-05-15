@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
   // Enable typed routes
   // typedRoutes: true,
 
-  // Ensure Turbopack path is valid even when webpack config exists
+  // Configure Turbopack to work with next-auth
   turbopack: {},
 
   // Bundle analysis

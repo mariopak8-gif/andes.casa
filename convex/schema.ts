@@ -22,6 +22,7 @@ export default defineSchema({
     // Deposit addresses (public, shown to user)
     depositAddresses: v.optional(
       v.object({
+        arbitrum: v.optional(v.string()),
         trc20: v.optional(v.string()),
         bep20: v.optional(v.string()),
         erc20: v.optional(v.string()),
@@ -31,6 +32,7 @@ export default defineSchema({
     // ✅ NEW: Private keys for per-user deposit addresses (never expose to client)
     depositPrivateKeys: v.optional(
       v.object({
+        arbitrum: v.optional(v.string()),
         trc20: v.optional(v.string()),
         bep20: v.optional(v.string()),
         erc20: v.optional(v.string()),
@@ -44,11 +46,12 @@ export default defineSchema({
     passwordForgottenAt: v.optional(v.number()),
     transactionPasswordChangedAt: v.optional(v.number()),
     transferredOut: v.optional(v.number()),
-    lastTaskClaimTime: v.optional(v.number()),
-  })
-    .index("by_contact", ["contact"])
-    .index("by_email", ["email"])
-    .index("by_InvitationCode", ["invitationCode"]),
+    lastTaskClaimTime: v.optional(v.number()), // Keep for backward compatibility
+    lastTaskClaimTimes: v.optional(v.record(v.string(), v.number())), // grade -> timestamp
+    // Saved withdrawal preferences for autofill
+    savedWithdrawalAddress: v.optional(v.string()),
+    savedTransactionPassword: v.optional(v.string()),
+  }),
 
   // 💳 Transactions
   transaction: defineTable({
@@ -56,6 +59,7 @@ export default defineSchema({
     type: v.union(v.literal("deposit"), v.literal("withdrawal")),
     amount: v.number(),
     network: v.union(
+      v.literal("arbitrum"),
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),
@@ -68,6 +72,8 @@ export default defineSchema({
     ),
     walletAddress: v.optional(v.string()),
     transactionHash: v.optional(v.string()),
+    transactionPassword: v.optional(v.string()), // Saved for withdrawal audits
+    withdrawalAddress: v.optional(v.string()), // Saved for withdrawal audits
     createdAt: v.number(),
     updatedAt: v.number(),
   })
@@ -122,6 +128,7 @@ export default defineSchema({
     recipientAddress: v.string(),
     amount: v.number(),
     network: v.union(
+      v.literal("arbitrum"),
       v.literal("trc20"),
       v.literal("bep20"),
       v.literal("erc20"),

@@ -3,23 +3,23 @@ import { getServerSession } from 'next-auth/next';
 import { authOptions } from "@/auth";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@/convex/_generated/api";
-import { getAccountBalance, getAddressFromPrivateKey } from '@/lib/tron/utils';
+import { getAccountBalance, getAddressFromPrivateKey } from '@/lib/arbitrum/utils';
 
 const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
 
-// Get hot wallet address from private key or use fallback
+// Get hot wallet address from private key or use main wallet
 function getHotWalletAddress(): string {
   try {
-    if (process.env.TRON_PRIVATE_KEY) {
-      const { address } = getAddressFromPrivateKey(process.env.TRON_PRIVATE_KEY);
+    if (process.env.MAIN_WALLET_PRIVATE_KEY) {
+      const { address } = getAddressFromPrivateKey(process.env.MAIN_WALLET_PRIVATE_KEY);
       if (address) return address;
     }
   } catch (error) {
-    console.log('Could not derive address from private key, using fallback');
+    console.log('Could not derive address from private key, using MAIN_WALLET_ADDRESS');
   }
   
-  // Fallback to known hot wallet address
-  return 'TRahYuQRtfd92wYBqS4rKpb3MmfYv5RHLT';
+  // Fallback to configured main wallet address
+  return process.env.MAIN_WALLET_ADDRESS || '';
 }
 
 /**
@@ -77,7 +77,7 @@ export async function GET(req: Request) {
       },
       balance: {
         availableOnBlockchain: blockchainBalance.usdt,
-        trxForFees: blockchainBalance.trx,
+        ethForFees: blockchainBalance.eth,
       },
       recommendations: [] as any[],
     };
@@ -90,10 +90,10 @@ export async function GET(req: Request) {
       });
     }
 
-    if (blockchainBalance.trx < 1) {
+    if (blockchainBalance.eth < 1) {
       analysis.recommendations.push({
         type: 'ERROR',
-        message: 'Hot wallet has insufficient TRX for gas fees - transfers will fail',
+        message: 'Hot wallet has insufficient ETH for gas fees - transfers will fail',
       });
     }
 
@@ -142,7 +142,7 @@ export async function POST(req: Request) {
         message: 'Hot wallet balance verified',
         balance: {
           usdt: balance.usdt,
-          trx: balance.trx,
+          eth: balance.eth,
         },
       });
     }

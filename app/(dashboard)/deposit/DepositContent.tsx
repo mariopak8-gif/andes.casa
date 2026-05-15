@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useQuery } from "convex/react";
@@ -8,7 +8,7 @@ import { api } from "@/convex/_generated/api";
 import QRCode from "qrcode";
 import toast from "react-hot-toast";
 import { DepositCard } from "./_components/DepositCard";
-// network selector not needed now that only TRC20 is supported
+// network selector not needed now that only Arbitrum is supported
 import { DepositHeader } from "./_components/DepositHeader";
 import { TeamSection } from "./_components/TeamSection";
 import { useDepositAddress } from "@/lib/hooks/useDepositAddress";
@@ -24,8 +24,8 @@ const AUTH_STATE = {
 export default function DepositContent() {
   const { data: session, status } = useSession();
 
-  // Deposit state (only TRC20)
-  const selectedNetwork = "trc20";
+  // ✅ Deposit state (Arbitrum only)
+  const selectedNetwork = "arbitrum";
   const [copied, setCopied] = useState(false);
   const [qrSrc, setQrSrc] = useState("");
   const router = useRouter();
@@ -49,8 +49,8 @@ export default function DepositContent() {
     userId: user?._id,
   });
 
-  // Get current address for TRC20 network
-  const currentAddress = depositAddresses?.trc20 || localAddress || "";
+  // Get current address for Arbitrum network (filter out any old TRC20 addresses)
+  const currentAddress = ((depositAddresses?.arbitrum?.startsWith('0x')) ? depositAddresses.arbitrum : undefined) || localAddress || "";
 
   // ROBUST AUTH STATE LOGIC
   const authState = useMemo(() => {
@@ -75,12 +75,12 @@ export default function DepositContent() {
 
 
 
-  // Deposit information (Tron/TRC20 only) - memoized to keep reference stable
+  // ✅ Deposit information (Arbitrum only) - memoized to keep reference stable
   const depositInfo = useMemo(
     () => ({
-      id: "trc20",
-      network: "Tron (TRC20)",
-      token: "USDT / TRX",
+      id: "arbitrum",
+      network: "Arbitrum (L2)",
+      token: "USDT / ETH",
       minDeposit: 20,
     }),
     []
@@ -90,6 +90,9 @@ export default function DepositContent() {
   // Balance state 
   const [walletBalance, setWalletBalance] = useState<{ trx: number; usdt: number } | null>(null);
   const [loadingBalance, setLoadingBalance] = useState(false);
+  const [checkCooldownExpiry, setCheckCooldownExpiry] = useState<number | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const checkingRef = useRef(false);
 
   // Format address for display
   const shortAddress = useMemo(() => {
@@ -99,19 +102,23 @@ export default function DepositContent() {
     return `${start}...${end}`;
   }, [currentAddress]);
 
-  // Sync local address with query result
+  // Sync local address with query result - Auto-generate Arbitrum address if missing
   useEffect(() => {
   if (
     authState === AUTH_STATE.AUTHENTICATED &&
     user?._id &&
     depositAddresses !== undefined && // query has finished loading (not undefined)
-    !depositAddresses?.trc20 &&        // no address exists yet
     !generating                        // not already in progress
   ) {
-    generateAddress("trc20");
+    // Generate if no valid Arbitrum address exists (must start with 0x)
+    if (!depositAddresses?.arbitrum || !depositAddresses.arbitrum.startsWith('0x')) {
+      generateAddress("arbitrum");
+    }
   }
 }, [authState, user?._id, depositAddresses, generating, generateAddress]);
-  // Initial balance check on mount or address change
+
+  // ✅ OPTIMIZED: Only check balance on demand (not automatically on mount)
+  // This prevents blocking the page load with blockchain queries
   useEffect(() => {
     let mounted = true;
     let timeoutId: NodeJS.Timeout;
@@ -124,7 +131,7 @@ export default function DepositContent() {
         const controller = new AbortController();
         timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
         
-        const response = await fetch("/api/tron/check-deposits", {
+        const response = await fetch("/api/arbitrum/check-deposits", {
           signal: controller.signal,
         });
         
@@ -158,38 +165,84 @@ export default function DepositContent() {
       }
     };
 
-    if (currentAddress) {
-      checkBalance();
-    }
+    // ✅ REMOVED: Auto-check on mount to improve initial load performance
+    // Balance is now only checked when user clicks "Check Deposits" button
 
     return () => {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, [currentAddress]);
+  }, []); // ✅ Empty dependency array - effect only runs once on mount (for cleanup)
 
-  // QR Code generation effect
+  // ✅ OPTIMIZED: Defer QR Code generation until after page is interactive
+  // Uses requestIdleCallback for better performance, fallback to setTimeout
   useEffect(() => {
     let mounted = true;
+    let timeoutId: NodeJS.Timeout | number;
 
     if (!currentAddress) {
       setQrSrc("");
       return;
     }
 
-    QRCode.toDataURL(currentAddress, { errorCorrectionLevel: "H" })
-      .then((url) => {
+    // Generate QR code after page is interactive (not blocking)
+    const generateQR = async () => {
+      try {
+        const url = await QRCode.toDataURL(currentAddress, { errorCorrectionLevel: "H" });
         if (mounted) setQrSrc(url);
-      })
-      .catch((error) => {
+      } catch (error) {
         console.error("QR generation failed:", error);
         if (mounted) setQrSrc("");
-      });
+      }
+    };
+
+    // Use requestIdleCallback if available, fallback to setTimeout
+    if ("requestIdleCallback" in window) {
+      timeoutId = window.requestIdleCallback(generateQR, { timeout: 2000 });
+    } else {
+      timeoutId = setTimeout(generateQR, 100);
+    }
 
     return () => {
       mounted = false;
+      if ("cancelIdleCallback" in window && typeof timeoutId === "number") {
+        window.cancelIdleCallback(timeoutId as number);
+      } else if (typeof timeoutId === "number") {
+        clearTimeout(timeoutId);
+      }
     };
   }, [currentAddress]);
+
+  // Cooldown countdown effect
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+
+    if (checkCooldownExpiry) {
+      const updateCountdown = () => {
+        const now = Date.now();
+        const remaining = Math.max(0, Math.ceil((checkCooldownExpiry - now) / 1000));
+
+        setCooldownSeconds(remaining);
+
+        if (remaining > 0) {
+          timeoutId = setTimeout(updateCountdown, 1000);
+        } else {
+          setCheckCooldownExpiry(null);
+          setCooldownSeconds(0);
+        }
+      };
+
+      updateCountdown();
+    } else {
+      setCooldownSeconds(0);
+    }
+
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [checkCooldownExpiry]);
 
   // Copy address handler
   const handleCopy = async () => {
@@ -208,15 +261,28 @@ export default function DepositContent() {
 
   // Handle manual address generation (optional button)
   const handleGenerateAddress = async () => {
-    await generateAddress('trc20');
+    const newAddr = await generateAddress('arbitrum');
+    if (newAddr) {
+      setLocalAddress(newAddr); // Set immediately for instant UI feedback
+    }
   };
 
   const checkDeposits = async () => {
+     if (checkingRef.current) return;
+     if (checkCooldownExpiry && Date.now() < checkCooldownExpiry) {
+       toast.error("Please wait before checking again.");
+       return;
+     }
+
+     checkingRef.current = true;
+     setCheckCooldownExpiry(Date.now() + 2 * 60 * 1000);
+     toast("Cooldown started - please wait 2 minutes before checking again.");
+
      try {
         const toastId = toast.loading("Scanning blockchain...");
         setLoadingBalance(true);
         
-        const response = await fetch("/api/tron/check-deposits");
+        const response = await fetch("/api/arbitrum/check-deposits");
         const data = await response.json();
         
         // Update balance state
@@ -233,8 +299,18 @@ export default function DepositContent() {
         console.error("Check deposits failed:", error);
         toast.error("Failed to sync deposits");
       } finally {
+        checkingRef.current = false;
         setLoadingBalance(false);
       }
+  };
+
+  // ✅ NEW: Manual balance check for on-demand queries
+  const handleCheckBalance = async () => {
+    if (!currentAddress) {
+      toast.error("Waiting for address generation...");
+      return;
+    }
+    await checkDeposits();
   };
 
   const userName = user?.fullname || "User";
@@ -267,6 +343,21 @@ export default function DepositContent() {
             Securely fund your account using our multi-chain gateway. 
             All deposits are monitored 24/7 with enterprise-grade security.
           </p>
+        </div>
+
+        {/* Arbitrum Network Warning Banner */}
+        <div className="mb-8 rounded-2xl border-2 p-4 bg-blue-50 border-blue-400">
+          <div className="flex items-start gap-3">
+            <div className="text-2xl flex-shrink-0 pt-0.5">🔗</div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-900 mb-1">
+                ⚡ Recommended: Use Arbitrum Network
+              </p>
+              <p className="text-sm text-blue-800">
+                For faster transactions and lower fees, we highly recommend using the Arbitrum network for all deposits and withdrawals.
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -325,6 +416,7 @@ export default function DepositContent() {
                    <DepositCard
                       loading={generating || loadingBalance}
                       checking={loadingBalance}
+                      cooldownSeconds={cooldownSeconds}
                       qrSrc={qrSrc}
                       shortAddress={shortAddress}
                       userAddress={currentAddress}
